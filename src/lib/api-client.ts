@@ -1,71 +1,89 @@
-// // src/lib/api-client.ts
-// export async function apiFetch<T>(url: string, options: RequestInit = {}): Promise<T> {
-//   const token = typeof window !== 'undefined'
-//     ? localStorage.getItem('token')
-//     : null;
+// src/lib/api-client.ts
+const API_BASE_URL = 'http://localhost:8080'; // gateway
 
-//   const headers: HeadersInit = {
-//     'Content-Type': 'application/json',
-//     ...(token ? { Authorization: `Bearer ${token}` } : {}),
-//     ...(options.headers || {}),
-//   };
+export async function apiFetch<T>(
+  url: string,
+  options: RequestInit = {}
+): Promise<T> {
+  const token =
+    typeof window !== 'undefined'
+      ? localStorage.getItem('access_token')
+      : null;
 
-//   const res = await fetch(url, {
-//     ...options,
-//     headers,
-//   });
+  // Dùng Record<string, string> để index được bằng ['Authorization']
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(options.headers as Record<string, string> | undefined),
+  };
 
-//   if (!res.ok) {
-//     const text = await res.text();
-//     throw new Error(text || 'API error');
-//   }
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
 
-//   return res.json();
-// }
+  const res = await fetch(`${API_BASE_URL}${url}`, {
+    ...options,
+    headers, // TS tự hiểu là HeadersInit được
+  });
+
+  if (!res.ok) {
+    let message = `HTTP ${res.status}`;
+    try {
+      const data = (await res.json()) as { message?: string };
+      if (data?.message) message = data.message;
+    } catch {
+      // ignore
+    }
+    throw new Error(message);
+  }
+
+  return (await res.json()) as T;
+}
+
+
 
 
 
 
 
 // src/lib/api-client.ts
-export async function apiFetch<T>(
-  url: string,
-  options: RequestInit = {}
-): Promise<T> {
-  const baseUrl =
-    process.env.NEXT_PUBLIC_API_GATEWAY_URL || 'http://localhost:8080';
+// export async function apiFetch<T>(
+//   url: string,
+//   options: RequestInit = {}
+// ): Promise<T> {
+//   const baseUrl =
+//     process.env.NEXT_PUBLIC_API_GATEWAY_URL || 'http://localhost:8080';
 
-  const res = await fetch(`${baseUrl}${url}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(options.headers || {}),
-    },
-    credentials: 'include',
-  });
+//   const res = await fetch(`${baseUrl}${url}`, {
+//     ...options,
+//     headers: {
+//       'Content-Type': 'application/json',
+//       ...(options.headers || {}),
+//     },
+//     credentials: 'include',
+//   });
 
-  if (!res.ok) {
-  let message = `HTTP ${res.status}`;
+//   if (!res.ok) {
+//   let message = `HTTP ${res.status}`;
 
-  try {
-    const data: unknown = await res.json();
+//   try {
+//     const data: unknown = await res.json();
 
-    // type guard: kiểm tra object có field message là string hay không
-    if (
-      typeof data === 'object' &&
-      data !== null &&
-      'message' in data &&
-      typeof (data as { message: unknown }).message === 'string'
-    ) {
-      message = (data as { message: string }).message;
-    }
-  } catch {
-    // ignore parse error, giữ message mặc định
-  }
+//     // type guard: kiểm tra object có field message là string hay không
+//     if (
+//       typeof data === 'object' &&
+//       data !== null &&
+//       'message' in data &&
+//       typeof (data as { message: unknown }).message === 'string'
+//     ) {
+//       message = (data as { message: string }).message;
+//     }
+//   } catch {
+//     // ignore parse error, giữ message mặc định
+//   }
 
-  throw new Error(message);
-}
+//   throw new Error(message);
+// }
 
 
-  return res.json();
-}
+//   return res.json();
+// }

@@ -1,5 +1,8 @@
 // src/types/order.ts
 export interface Order {
   id: number;
-  // TODO: thêm các field khác giống BE
+  // thêm các field BE trả về nếu cần
+  // code?: string;
+  // totalAmount?: number;
 }
+

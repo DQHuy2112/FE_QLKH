@@ -1,3 +1,4 @@
+// src/lib/auth.ts
 const TOKEN_KEY = 'access_token';
 
 export function saveToken(token: string) {
