@@ -453,28 +453,33 @@ export default function Sidebar() {
               <path d="M3 5L7 9L11 5" stroke="#0b08ab" strokeWidth="1.5" strokeLinecap="round" />
             </svg>
           </button>
+
           {expandedMenus.includes('categories') && (
             <div className="ml-8 space-y-1 mt-1 animate-fade-in">
               <div className="border-l-2 border-green-200 pl-3 py-1.5 space-y-1.5">
+                {/* Nguồn hàng xuất/nhập */}
                 <Link
                   href="/categories/suppliers"
                   className={`block text-xs cursor-pointer transition-all py-1 px-2 rounded ${pathname === '/categories/suppliers' ||
-                    pathname === '/categories/suppliers/create' ||
-                    pathname?.startsWith('/categories/suppliers/edit/')
-                    ? 'bg-blue-100 text-blue-700 font-semibold'
-                    : 'text-[#0b08ab] hover:text-blue-700 hover:bg-blue-50'
+                      pathname === '/categories/suppliers/create' ||
+                      pathname?.startsWith('/categories/suppliers/edit/') ||
+                      pathname?.startsWith('/categories/suppliers/detail/')
+                      ? 'bg-blue-100 text-blue-700 font-semibold'
+                      : 'text-[#0b08ab] hover:text-blue-700 hover:bg-blue-50'
                     }`}
                 >
                   Nguồn hàng xuất/nhập
                 </Link>
 
+                {/* Danh mục hàng hóa */}
                 <Link
                   href="/dashboard/products"
                   className={`block text-xs cursor-pointer transition-all py-1 px-2 rounded ${pathname === '/dashboard/products' ||
-                    pathname === '/dashboard/products/create' ||
-                    pathname?.startsWith('/dashboard/products/edit/')
-                    ? 'bg-blue-100 text-blue-700 font-semibold'
-                    : 'text-[#0b08ab] hover:text-blue-700 hover:bg-blue-50'
+                      pathname === '/dashboard/products/create' ||
+                      pathname?.startsWith('/dashboard/products/edit/') ||
+                      pathname?.startsWith('/dashboard/products/detail/')
+                      ? 'bg-blue-100 text-blue-700 font-semibold'
+                      : 'text-[#0b08ab] hover:text-blue-700 hover:bg-blue-50'
                     }`}
                 >
                   Danh mục hàng hóa
@@ -483,6 +488,7 @@ export default function Sidebar() {
             </div>
           )}
         </div>
+
       </nav>
     </aside>
   );

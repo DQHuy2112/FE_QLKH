@@ -1,64 +1,107 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { FormEvent, useEffect, useState } from 'react';
+import { useRouter, useParams } from 'next/navigation';
+
 import Header from '@/components/layout/Header';
 import Sidebar from '@/components/layout/Sidebar';
-import { createSupplier } from '@/services/supplier.service';
+import {
+    getSupplier,
+    updateSupplier,
+    type Supplier,
+} from '@/services/supplier.service';
 
-export default function ThemMoiNguon() {
+export default function EditSupplierPage() {
     const router = useRouter();
+    const params = useParams();
 
-    // form state
-    const [type, setType] = useState('');
+    const rawId = Array.isArray(params?.id) ? params.id[0] : params?.id;
+    const supplierId = Number(rawId);
+
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
     const [name, setName] = useState('');
     const [code, setCode] = useState('');
+    const [type, setType] = useState('');      // 👈 Loại nguồn
     const [phone, setPhone] = useState('');
     const [email, setEmail] = useState('');
     const [address, setAddress] = useState('');
-    const [taxCode, setTaxCode] = useState('');
-    const [representative, setRepresentative] = useState('');
-    const [position, setPosition] = useState('');
     const [note, setNote] = useState('');
-    const [status, setStatus] = useState<'active' | 'inactive'>('active');
 
-    const [saving, setSaving] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    useEffect(() => {
+        if (!rawId || Number.isNaN(supplierId)) {
+            setError('ID nguồn hàng không hợp lệ');
+            setLoading(false);
+            return;
+        }
+
+        (async () => {
+            try {
+                setError(null);
+                const s: Supplier = await getSupplier(supplierId);
+
+                setName(s.name);
+                setCode(s.code ?? '');
+                setType(s.type ?? '');           // 👈 load loại nguồn
+                setPhone(s.phone ?? '');
+                setEmail(s.email ?? '');
+                setAddress(s.address ?? '');
+                setNote(s.description ?? '');
+            } catch (e) {
+                const msg =
+                    e instanceof Error
+                        ? e.message
+                        : 'Không tải được thông tin nguồn hàng';
+                setError(msg);
+            } finally {
+                setLoading(false);
+            }
+        })();
+    }, [supplierId, rawId]);
 
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
         setError(null);
 
-        // kiểm tra field bắt buộc
-        if (!type || !name || !code || !phone || !address) {
-            setError('Vui lòng nhập đầy đủ Loại nguồn, Tên nguồn, Mã nguồn, Số điện thoại và Địa chỉ');
+        if (!name || !code) {
+            setError('Vui lòng nhập Tên nguồn và Mã nguồn');
             return;
         }
 
         try {
             setSaving(true);
 
-            await createSupplier({
+            const payload: Partial<Supplier> = {
                 code,
                 name,
-                type,
+                type: type || undefined,       // 👈 gửi loại nguồn
                 phone,
                 email,
                 address,
-                // hiện tại DB chỉ có description, lưu ghi chú ở đây
                 description: note,
-            });
+                image: null,
+            };
 
-            // tạo xong quay lại danh sách
+            await updateSupplier(supplierId, payload);
             router.push('/categories/suppliers');
-        } catch (err) {
+        } catch (e) {
             const msg =
-                err instanceof Error ? err.message : 'Tạo mới nguồn hàng thất bại';
+                e instanceof Error ? e.message : 'Cập nhật nguồn hàng thất bại';
             setError(msg);
         } finally {
             setSaving(false);
         }
     };
+
+    if (loading) {
+        return <p className="p-6">Đang tải...</p>;
+    }
+
+    if (error && !name && !code) {
+        return <p className="p-6 text-red-600">{error}</p>;
+    }
 
     return (
         <div className="min-h-screen">
@@ -66,17 +109,15 @@ export default function ThemMoiNguon() {
             <Sidebar />
 
             <main className="ml-[377px] mt-[113px] p-6 pr-12">
-                {/* Breadcrumb */}
                 <div className="mb-4">
                     <p className="text-base font-bold text-gray-800">
-                        Danh mục &gt; Nguồn hàng xuất/nhập &gt; Thêm mới nguồn
+                        Danh mục &gt; Nguồn hàng xuất/nhập &gt; Chỉnh sửa nguồn
                     </p>
                 </div>
 
-                {/* Main Form */}
                 <div className="bg-white rounded-lg shadow-2xl p-8">
                     <h2 className="text-xl font-bold text-center mb-6">
-                        THÊM MỚI NGUỒN HÀNG
+                        CHỈNH SỬA NGUỒN HÀNG
                     </h2>
 
                     {error && (
@@ -92,7 +133,7 @@ export default function ThemMoiNguon() {
                         {/* Loại nguồn */}
                         <div className="grid grid-cols-3 gap-4 items-center">
                             <label className="text-sm font-medium text-gray-700">
-                                Loại nguồn <span className="text-red-500">*</span>
+                                Loại nguồn
                             </label>
                             <div className="col-span-2 relative">
                                 <select
@@ -101,11 +142,11 @@ export default function ThemMoiNguon() {
                                     onChange={(e) => setType(e.target.value)}
                                 >
                                     <option value="">Chọn loại nguồn</option>
-                                    <option>Nhà cung cấp</option>
-                                    <option>Đại lý cấp 1</option>
-                                    <option>Đại lý cấp 2</option>
-                                    <option>NVBH</option>
-                                    <option>Kho tổng</option>
+                                    <option value="Nhà cung cấp">Nhà cung cấp</option>
+                                    <option value="Đại lý cấp 1">Đại lý cấp 1</option>
+                                    <option value="Đại lý cấp 2">Đại lý cấp 2</option>
+                                    <option value="NVBH">NVBH</option>
+                                    <option value="Kho tổng">Kho tổng</option>
                                 </select>
                                 <svg
                                     className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none"
@@ -154,7 +195,7 @@ export default function ThemMoiNguon() {
                         {/* Số điện thoại */}
                         <div className="grid grid-cols-3 gap-4 items-center">
                             <label className="text-sm font-medium text-gray-700">
-                                Số điện thoại <span className="text-red-500">*</span>
+                                Số điện thoại
                             </label>
                             <input
                                 type="text"
@@ -182,55 +223,13 @@ export default function ThemMoiNguon() {
                         {/* Địa chỉ */}
                         <div className="grid grid-cols-3 gap-4 items-start">
                             <label className="text-sm font-medium text-gray-700 pt-2">
-                                Địa chỉ <span className="text-red-500">*</span>
+                                Địa chỉ
                             </label>
                             <textarea
                                 className="col-span-2 px-4 py-2 border border-blue-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 h-24 resize-none"
                                 placeholder="Nhập địa chỉ"
                                 value={address}
                                 onChange={(e) => setAddress(e.target.value)}
-                            />
-                        </div>
-
-                        {/* Mã số thuế */}
-                        <div className="grid grid-cols-3 gap-4 items-center">
-                            <label className="text-sm font-medium text-gray-700">
-                                Mã số thuế
-                            </label>
-                            <input
-                                type="text"
-                                className="col-span-2 px-4 py-2 border border-blue-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                placeholder="Nhập mã số thuế"
-                                value={taxCode}
-                                onChange={(e) => setTaxCode(e.target.value)}
-                            />
-                        </div>
-
-                        {/* Người đại diện */}
-                        <div className="grid grid-cols-3 gap-4 items-center">
-                            <label className="text-sm font-medium text-gray-700">
-                                Người đại diện
-                            </label>
-                            <input
-                                type="text"
-                                className="col-span-2 px-4 py-2 border border-blue-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                placeholder="Nhập tên người đại diện"
-                                value={representative}
-                                onChange={(e) => setRepresentative(e.target.value)}
-                            />
-                        </div>
-
-                        {/* Chức vụ */}
-                        <div className="grid grid-cols-3 gap-4 items-center">
-                            <label className="text-sm font-medium text-gray-700">
-                                Chức vụ
-                            </label>
-                            <input
-                                type="text"
-                                className="col-span-2 px-4 py-2 border border-blue-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                placeholder="Nhập chức vụ"
-                                value={position}
-                                onChange={(e) => setPosition(e.target.value)}
                             />
                         </div>
 
@@ -247,38 +246,7 @@ export default function ThemMoiNguon() {
                             />
                         </div>
 
-                        {/* Trạng thái (tạm thời chỉ lưu FE) */}
-                        <div className="grid grid-cols-3 gap-4 items-center">
-                            <label className="text-sm font-medium text-gray-700">
-                                Trạng thái
-                            </label>
-                            <div className="col-span-2 flex items-center gap-6">
-                                <label className="flex items-center gap-2 cursor-pointer">
-                                    <input
-                                        type="radio"
-                                        name="status"
-                                        value="active"
-                                        checked={status === 'active'}
-                                        onChange={() => setStatus('active')}
-                                        className="w-4 h-4 text-blue-600 focus:ring-blue-500"
-                                    />
-                                    <span className="text-sm">Hoạt động</span>
-                                </label>
-                                <label className="flex items-center gap-2 cursor-pointer">
-                                    <input
-                                        type="radio"
-                                        name="status"
-                                        value="inactive"
-                                        checked={status === 'inactive'}
-                                        onChange={() => setStatus('inactive')}
-                                        className="w-4 h-4 text-blue-600 focus:ring-blue-500"
-                                    />
-                                    <span className="text-sm">Ngừng hoạt động</span>
-                                </label>
-                            </div>
-                        </div>
-
-                        {/* Action Buttons */}
+                        {/* Buttons */}
                         <div className="flex justify-center gap-6 mt-8">
                             <button
                                 type="button"

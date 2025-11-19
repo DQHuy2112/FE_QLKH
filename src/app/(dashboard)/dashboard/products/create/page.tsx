@@ -1,19 +1,21 @@
 'use client';
 
-import { ChangeEvent, FormEvent, useState } from 'react';
+import {
+  ChangeEvent,
+  FormEvent,
+  useEffect,
+  useState,
+} from 'react';
 import { useRouter } from 'next/navigation';
 import Header from '@/components/layout/Header';
 import Sidebar from '@/components/layout/Sidebar';
 import { createProduct, uploadProductImage } from '@/services/product.service';
 import type { ProductPayload } from '@/types/product';
+import { Category } from '@/types/category';
+import { getCategories } from '@/services/category.service';
 
-
-const CATEGORY_OPTIONS = [
-  { id: 1, label: 'Điện thoại' },
-  { id: 2, label: 'Tai nghe' },
-  { id: 3, label: 'Cáp sạc - Củ sạc' },
-  { id: 4, label: 'Phụ kiện' },
-];
+// 👉 import NCC
+import { getSuppliers, type Supplier } from '@/services/supplier.service';
 
 const UNIT_OPTIONS = ['Cái', 'Chiếc', 'Bộ', 'Hộp', 'Thùng'];
 
@@ -34,6 +36,7 @@ export default function CreateProductPage() {
   const [categoryId, setCategoryId] = useState<number | ''>('');
   const [unit, setUnit] = useState(UNIT_OPTIONS[0]);
   const [price, setPrice] = useState('');
+  const [quantity, setQuantity] = useState(''); // số lượng tồn ban đầu
   const [importPrice, setImportPrice] = useState('');
   const [salePrice, setSalePrice] = useState('');
   const [stockMin, setStockMin] = useState('');
@@ -47,6 +50,37 @@ export default function CreateProductPage() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
 
+  // danh mục từ BE
+  const [categories, setCategories] = useState<Category[]>([]);
+
+  // 👉 danh sách NCC + supplierId được chọn
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [supplierId, setSupplierId] = useState<number | ''>('');
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchCategoriesAndSuppliers = async () => {
+      try {
+        const [catList, supplierList] = await Promise.all([
+          getCategories(),
+          getSuppliers(),
+        ]);
+        if (!cancelled) {
+          setCategories(catList);
+          setSuppliers(supplierList);
+        }
+      } catch (err) {
+        console.error('Lỗi tải dữ liệu danh mục / nhà cung cấp', err);
+      }
+    };
+
+    fetchCategoriesAndSuppliers();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -54,23 +88,26 @@ export default function CreateProductPage() {
     setLoading(true);
 
     try {
-      let imageUrl: string | null = null;
+      let imagePath: string | null = null;
 
       if (imageFile) {
-        // BE trả full URL (http://localhost:8081/uploads/products/xxx.jpg)
-        imageUrl = await uploadProductImage(imageFile);
+        // BE trả về relative path: /uploads/products/xxx.jpg
+        imagePath = await uploadProductImage(imageFile);
       }
 
       const payload: ProductPayload = {
         code,
         name,
         shortDescription: description,
-        image: imageUrl,
+        image: imagePath, // Lưu relative path vào DB
         unitPrice: parseMoney(price),
-        quantity: 0,
+        quantity: quantity === '' ? 0 : Number(quantity),
+        minStock: stockMin === '' ? null : Number(stockMin),
+        maxStock: stockMax === '' ? null : Number(stockMax),
         status,
         categoryId: categoryId === '' ? null : Number(categoryId),
-        supplierId: null,
+        // 👉 map supplierId đã chọn, nếu không chọn thì null
+        supplierId: supplierId === '' ? null : Number(supplierId),
       };
 
       await createProduct(payload);
@@ -86,8 +123,6 @@ export default function CreateProductPage() {
     }
   };
 
-
-
   const handleImageChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] ?? null;
     setImageFile(file);
@@ -99,10 +134,6 @@ export default function CreateProductPage() {
       setImagePreview(null);
     }
   };
-
-
-
-
 
   return (
     <div className="min-h-screen">
@@ -189,9 +220,51 @@ export default function CreateProductPage() {
                   required
                 >
                   <option value="">Chọn nhóm hàng</option>
-                  {CATEGORY_OPTIONS.map((opt) => (
-                    <option key={opt.id} value={opt.id}>
-                      {opt.label}
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+                <svg
+                  className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 9l-7 7-7-7"
+                  />
+                </svg>
+              </div>
+            </div>
+
+            {/* 👉 Nhà cung cấp */}
+            <div className="grid grid-cols-3 gap-4 items-center">
+              <label
+                htmlFor="supplier"
+                className="text-sm font-medium text-gray-700"
+              >
+                Nguồn hàng / Nhà cung cấp
+              </label>
+              <div className="col-span-2 relative">
+                <select
+                  id="supplier"
+                  className="w-full px-4 py-2 border border-blue-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none bg-white"
+                  value={supplierId}
+                  onChange={(e) =>
+                    setSupplierId(
+                      e.target.value === '' ? '' : Number(e.target.value),
+                    )
+                  }
+                >
+                  <option value="">Chọn nhà cung cấp</option>
+                  {suppliers.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
                     </option>
                   ))}
                 </select>
@@ -264,6 +337,25 @@ export default function CreateProductPage() {
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
                 required
+              />
+            </div>
+
+            {/* Số lượng tồn */}
+            <div className="grid grid-cols-3 gap-4 items-center">
+              <label
+                htmlFor="quantity"
+                className="text-sm font-medium text-gray-700"
+              >
+                Số lượng tồn
+              </label>
+              <input
+                id="quantity"
+                type="number"
+                min={0}
+                className="col-span-2 px-4 py-2 border border-blue-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Nhập số lượng tồn ban đầu"
+                value={quantity}
+                onChange={(e) => setQuantity(e.target.value)}
               />
             </div>
 
@@ -353,7 +445,6 @@ export default function CreateProductPage() {
               />
             </div>
 
-
             {/* Hình ảnh */}
             <div className="grid grid-cols-3 gap-4 items-start">
               <label
@@ -379,7 +470,6 @@ export default function CreateProductPage() {
                 )}
               </div>
             </div>
-
 
             {/* Trạng thái */}
             <div className="grid grid-cols-3 gap-4 items-center">

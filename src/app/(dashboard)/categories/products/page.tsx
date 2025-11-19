@@ -90,7 +90,7 @@ export default function EditProductPage({ params }: Props) {
       };
 
       await updateProduct(productId, payload);
-      router.push('/categories/products');
+      router.push('/dashboard/categories/products');
     } catch (error: unknown) {
       const message =
         error instanceof Error

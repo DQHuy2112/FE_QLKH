@@ -1,10 +1,25 @@
 // src/services/supplier.service.ts
-const API_BASE =
-    process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
+import { apiFetch } from '@/lib/api-client';
+
+const SUPPLIER_BASE_URL = '/api/suppliers';
+const EXPORT_SUPPLIER_URL = '/api/exports/suppliers';
 
 export interface Supplier {
-    id: number;      // map với supplierId trong DB
+    id: number;
     code?: string;
+    name: string;
+    type?: string | null;
+    phone?: string | null;
+    address?: string | null;
+    email?: string | null;
+    description?: string | null;
+    image?: string | null;
+    createdAt?: string;
+    updatedAt?: string;
+}
+
+export interface ExportSupplier {
+    id: number;
     name: string;
 }
 
@@ -14,31 +29,55 @@ type ApiResponse<T> = {
     success?: boolean;
 };
 
+// ==== CRUD danh mục NCC (/api/suppliers) ====
+
 export async function getSuppliers(): Promise<Supplier[]> {
-    // Lấy token từ localStorage (chỉ chạy ở client)
-    const token =
-        typeof window !== "undefined"
-            ? localStorage.getItem("token")
-            : null;
+    const res = await apiFetch<ApiResponse<Supplier[]>>(SUPPLIER_BASE_URL);
+    return res.data;
+}
 
-    const headers: HeadersInit = {
-        "Content-Type": "application/json",
-    };
+export async function getSupplier(id: number): Promise<Supplier> {
+    const res = await apiFetch<ApiResponse<Supplier>>(
+        `${SUPPLIER_BASE_URL}/${id}`,
+    );
+    return res.data;
+}
 
-    // Nếu có token thì gắn Authorization
-    if (token) {
-        headers["Authorization"] = `Bearer ${token}`;
-    }
-
-    const res = await fetch(`${API_BASE}/api/exports/suppliers`, {
-        credentials: "include",
-        headers,
+export async function createSupplier(
+    payload: Partial<Supplier>,
+): Promise<Supplier> {
+    const res = await apiFetch<ApiResponse<Supplier>>(SUPPLIER_BASE_URL, {
+        method: 'POST',
+        body: JSON.stringify(payload),
     });
+    return res.data;
+}
 
-    if (!res.ok) {
-        throw new Error("Không lấy được danh sách nhà cung cấp");
-    }
+export async function updateSupplier(
+    id: number,
+    payload: Partial<Supplier>,
+): Promise<Supplier> {
+    const res = await apiFetch<ApiResponse<Supplier>>(
+        `${SUPPLIER_BASE_URL}/${id}`,
+        {
+            method: 'PUT',
+            body: JSON.stringify(payload),
+        },
+    );
+    return res.data;
+}
 
-    const json: ApiResponse<Supplier[]> = await res.json();
-    return json.data;
+export async function deleteSupplier(id: number): Promise<void> {
+    await apiFetch<ApiResponse<null>>(`${SUPPLIER_BASE_URL}/${id}`, {
+        method: 'DELETE',
+    });
+}
+
+// ==== Danh sách NCC cho phiếu xuất (/api/exports/suppliers) – GIỮ NGUYÊN ====
+
+export async function getExportSuppliers(): Promise<ExportSupplier[]> {
+    const res = await apiFetch<ApiResponse<ExportSupplier[]>>(
+        EXPORT_SUPPLIER_URL,
+    );
+    return res.data;
 }

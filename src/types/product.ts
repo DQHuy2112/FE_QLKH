@@ -1,4 +1,3 @@
-// src/types/product.ts
 export interface Product {
   id: number;
   code: string;
@@ -7,6 +6,9 @@ export interface Product {
   image?: string | null;
   unitPrice: number;
   quantity: number;
+  minStock?: number | null;   // 👈 THÊM
+  maxStock?: number | null;   // 👈 THÊM
+  categoryName: string | null;
   status: string;
   categoryId?: number | null;
   supplierId?: number | null;
@@ -14,7 +16,6 @@ export interface Product {
   updatedAt?: string;
 }
 
-// Dữ liệu gửi lên khi create/update
 export interface ProductPayload {
   code: string;
   name: string;
@@ -22,6 +23,8 @@ export interface ProductPayload {
   image?: string | null;
   unitPrice: number;
   quantity: number;
+  minStock?: number | null;   // 👈 THÊM
+  maxStock?: number | null;   // 👈 THÊM
   status: string;
   categoryId?: number | null;
   supplierId?: number | null;
