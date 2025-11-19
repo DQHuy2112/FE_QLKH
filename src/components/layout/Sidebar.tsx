@@ -9,64 +9,64 @@ export default function Sidebar() {
   const [expandedMenus, setExpandedMenus] = useState<string[]>([]);
 
   // Load expanded menus từ localStorage + auto mở menu đúng theo URL hiện tại
-useEffect(() => {
-  if (typeof window === 'undefined') return;
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
 
-  let mounted = true;
+    let mounted = true;
 
-  const initMenus = () => {
-    const saved = window.localStorage.getItem('expandedMenus');
-    if (saved) {
-      const parsed: string[] = JSON.parse(saved);
-      if (mounted) setExpandedMenus(parsed);
-      return;
-    }
+    const initMenus = () => {
+      const saved = window.localStorage.getItem('expandedMenus');
+      if (saved) {
+        const parsed: string[] = JSON.parse(saved);
+        if (mounted) setExpandedMenus(parsed);
+        return;
+      }
 
-    const initial: string[] = [];
+      const initial: string[] = [];
 
-    if (
-      pathname.startsWith('/dashboard/products') ||
-      pathname.startsWith('/dashboard/categories')
-    ) {
-      initial.push('categories');
-    }
+      if (
+        pathname.startsWith('/dashboard/products') ||
+        pathname.startsWith('/categories')
+      ) {
+        initial.push('categories');
+      }
 
-    if (pathname.startsWith('/dashboard/orders')) {
-      initial.push('internal');
-    }
+      if (pathname.startsWith('/orders')) {
+        initial.push('internal');
+      }
 
-    if (pathname.startsWith('/dashboard/inventory')) {
-      initial.push('internal');
-    }
+      if (pathname.startsWith('/inventory')) {
+        initial.push('internal');
+      }
 
-    if (pathname.includes('nvbh')) {
-      initial.push('sales');
-    }
+      if (pathname.includes('nvbh')) {
+        initial.push('sales');
+      }
 
-    if (pathname.includes('/reports')) {
-      initial.push('reports');
-    }
+      if (pathname.includes('/reports')) {
+        initial.push('reports');
+      }
 
-    if (
-      pathname.includes('/suppliers') ||
-      pathname.includes('/imports') ||
-      pathname.includes('/exports')
-    ) {
-      initial.push('ncc');
-    }
+      if (
+        pathname.includes('/suppliers') ||
+        pathname.includes('/imports') ||
+        pathname.includes('/exports')
+      ) {
+        initial.push('ncc');
+      }
 
-    if (mounted) {
-      setExpandedMenus(initial.length ? initial : ['ncc']);
-    }
-  };
+      if (mounted) {
+        setExpandedMenus(initial.length ? initial : ['ncc']);
+      }
+    };
 
-  // Schedule sang “tick” sau ⇒ không bị rule "set-state-in-effect" soi
-  setTimeout(initMenus, 0);
+    // Schedule sang "tick" sau ⇒ không bị rule "set-state-in-effect" soi
+    setTimeout(initMenus, 0);
 
-  return () => {
-    mounted = false;
-  };
-}, [pathname]);
+    return () => {
+      mounted = false;
+    };
+  }, [pathname]);
 
 
   const toggleMenu = (menu: string) => {
@@ -80,8 +80,6 @@ useEffect(() => {
       return newExpanded;
     });
   };
-
-  const isActive = (href: string) => pathname === href;
 
   return (
     <aside className="fixed top-[113px] left-[17px] w-[350px] h-[calc(100vh-130px)] bg-white overflow-y-auto shadow-2xl rounded-xl animate-slide-in border border-gray-100">
@@ -116,14 +114,13 @@ useEffect(() => {
 
       {/* Menu Items */}
       <nav className="p-3">
-        {/* Tổng quan – trỏ về /dashboard (KHÔNG phải / nữa) */}
+        {/* Tổng quan */}
         <Link
           href="/dashboard"
-          className={`w-full text-left px-3 py-2.5 rounded-lg mb-1.5 transition-all block ${
-            isActive('/dashboard')
-              ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg scale-[1.02]'
-              : 'hover:bg-gray-50 text-gray-700'
-          }`}
+          className={`w-full text-left px-3 py-2.5 rounded-lg mb-1.5 transition-all block ${pathname === '/dashboard' || pathname === '/'
+            ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg scale-[1.02]'
+            : 'hover:bg-gray-50 text-gray-700'
+            }`}
         >
           <div className="flex items-center gap-2.5">
             <svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor">
@@ -155,9 +152,8 @@ useEffect(() => {
               height="14"
               viewBox="0 0 14 14"
               fill="none"
-              className={`transition-transform flex-shrink-0 ${
-                expandedMenus.includes('ncc') ? 'rotate-180' : ''
-              }`}
+              className={`transition-transform flex-shrink-0 ${expandedMenus.includes('ncc') ? 'rotate-180' : ''
+                }`}
             >
               <path d="M3 5L7 9L11 5" stroke="#0b08ab" strokeWidth="1.5" strokeLinecap="round" />
             </svg>
@@ -171,14 +167,13 @@ useEffect(() => {
                 </div>
                 <Link
                   href="/dashboard/products/export/export-receipts"
-                  className={`block text-xs ml-3 cursor-pointer transition-all py-1 px-2 rounded ${
-                    pathname === '/dashboard/products/export/export-receipts' ||
+                  className={`block text-xs ml-3 cursor-pointer transition-all py-1 px-2 rounded ${pathname === '/dashboard/products/export/export-receipts' ||
                     pathname === '/dashboard/products/export/create-export-receipt' ||
                     pathname?.startsWith('/dashboard/products/export/view-export-receipt/') ||
                     pathname?.startsWith('/dashboard/products/export/edit-export-receipt/')
-                      ? 'bg-blue-100 text-blue-700 font-semibold'
-                      : 'text-[#0b08ab] hover:text-blue-700 hover:bg-blue-50'
-                  }`}
+                    ? 'bg-blue-100 text-blue-700 font-semibold'
+                    : 'text-[#0b08ab] hover:text-blue-700 hover:bg-blue-50'
+                    }`}
                 >
                   Phiếu xuất kho
                 </Link>
@@ -188,14 +183,13 @@ useEffect(() => {
                 </div>
                 <Link
                   href="/dashboard/products/import/import-receipts"
-                  className={`block text-xs ml-3 cursor-pointer transition-all py-1 px-2 rounded ${
-                    pathname === '/dashboard/products/import/import-receipts' ||
+                  className={`block text-xs ml-3 cursor-pointer transition-all py-1 px-2 rounded ${pathname === '/dashboard/products/import/import-receipts' ||
                     pathname === '/dashboard/products/import/create-import-receipt' ||
                     pathname?.startsWith('/dashboard/products/import/view-import-receipt/') ||
                     pathname?.startsWith('/dashboard/products/import/edit-import-receipt/')
-                      ? 'bg-blue-100 text-blue-700 font-semibold'
-                      : 'text-[#0b08ab] hover:text-blue-700 hover:bg-blue-50'
-                  }`}
+                    ? 'bg-blue-100 text-blue-700 font-semibold'
+                    : 'text-[#0b08ab] hover:text-blue-700 hover:bg-blue-50'
+                    }`}
                 >
                   Phiếu nhập kho
                 </Link>
@@ -223,9 +217,8 @@ useEffect(() => {
               height="14"
               viewBox="0 0 14 14"
               fill="none"
-              className={`transition-transform flex-shrink-0 ${
-                expandedMenus.includes('internal') ? 'rotate-180' : ''
-              }`}
+              className={`transition-transform flex-shrink-0 ${expandedMenus.includes('internal') ? 'rotate-180' : ''
+                }`}
             >
               <path d="M3 5L7 9L11 5" stroke="#0b08ab" strokeWidth="1.5" strokeLinecap="round" />
             </svg>
@@ -238,28 +231,26 @@ useEffect(() => {
                   <span className="text-xs font-medium">Xuất kho</span>
                 </div>
                 <Link
-                  href="/dashboard/orders/export/export-orders"
-                  className={`block text-xs ml-3 cursor-pointer transition-all py-1 px-2 rounded ${
-                    pathname === '/dashboard/orders/export/export-orders' ||
-                    pathname === '/dashboard/orders/export/create-export-order' ||
-                    pathname?.startsWith('/dashboard/orders/export/view-export-order/') ||
-                    pathname?.startsWith('/dashboard/orders/export/edit-export-order/')
-                      ? 'bg-blue-100 text-blue-700 font-semibold'
-                      : 'text-[#0b08ab] hover:text-blue-700 hover:bg-blue-50'
-                  }`}
+                  href="/orders/export/export-orders"
+                  className={`block text-xs ml-3 cursor-pointer transition-all py-1 px-2 rounded ${pathname === '/orders/export/export-orders' ||
+                    pathname === '/orders/export/create-export-order' ||
+                    pathname?.startsWith('/orders/export/view-export-order/') ||
+                    pathname?.startsWith('/orders/export/edit-export-order/')
+                    ? 'bg-blue-100 text-blue-700 font-semibold'
+                    : 'text-[#0b08ab] hover:text-blue-700 hover:bg-blue-50'
+                    }`}
                 >
                   Lệnh xuất kho
                 </Link>
                 <Link
-                  href="/dashboard/orders/export/internal-export-receipts"
-                  className={`block text-xs ml-3 cursor-pointer transition-all py-1 px-2 rounded ${
-                    pathname === '/dashboard/orders/export/internal-export-receipts' ||
-                    pathname === '/dashboard/orders/export/create-internal-export-receipt' ||
-                    pathname?.startsWith('/dashboard/orders/export/view-internal-export-receipt/') ||
-                    pathname?.startsWith('/dashboard/orders/export/edit-internal-export-receipt/')
-                      ? 'bg-blue-100 text-blue-700 font-semibold'
-                      : 'text-[#0b08ab] hover:text-blue-700 hover:bg-blue-50'
-                  }`}
+                  href="/orders/export/internal-export-receipts"
+                  className={`block text-xs ml-3 cursor-pointer transition-all py-1 px-2 rounded ${pathname === '/orders/export/internal-export-receipts' ||
+                    pathname === '/orders/export/create-internal-export-receipt' ||
+                    pathname?.startsWith('/orders/export/view-internal-export-receipt/') ||
+                    pathname?.startsWith('/orders/export/edit-internal-export-receipt/')
+                    ? 'bg-blue-100 text-blue-700 font-semibold'
+                    : 'text-[#0b08ab] hover:text-blue-700 hover:bg-blue-50'
+                    }`}
                 >
                   Phiếu xuất kho
                 </Link>
@@ -268,28 +259,26 @@ useEffect(() => {
                   <span className="text-xs font-medium">Nhập kho</span>
                 </div>
                 <Link
-                  href="/dashboard/orders/import/import-orders"
-                  className={`block text-xs ml-3 cursor-pointer transition-all py-1 px-2 rounded ${
-                    pathname === '/dashboard/orders/import/import-orders' ||
-                    pathname === '/dashboard/orders/import/create-import-order' ||
-                    pathname?.startsWith('/dashboard/orders/import/view-import-order/') ||
-                    pathname?.startsWith('/dashboard/orders/import/edit-import-order/')
-                      ? 'bg-blue-100 text-blue-700 font-semibold'
-                      : 'text-[#0b08ab] hover:text-blue-700 hover:bg-blue-50'
-                  }`}
+                  href="/orders/import/import-orders"
+                  className={`block text-xs ml-3 cursor-pointer transition-all py-1 px-2 rounded ${pathname === '/orders/import/import-orders' ||
+                    pathname === '/orders/import/create-import-order' ||
+                    pathname?.startsWith('/orders/import/view-import-order/') ||
+                    pathname?.startsWith('/orders/import/edit-import-order/')
+                    ? 'bg-blue-100 text-blue-700 font-semibold'
+                    : 'text-[#0b08ab] hover:text-blue-700 hover:bg-blue-50'
+                    }`}
                 >
                   Lệnh nhập kho
                 </Link>
                 <Link
-                  href="/dashboard/orders/import/internal-import-receipts"
-                  className={`block text-xs ml-3 cursor-pointer transition-all py-1 px-2 rounded ${
-                    pathname === '/dashboard/orders/import/internal-import-receipts' ||
-                    pathname === '/dashboard/orders/import/create-internal-import-receipt' ||
-                    pathname?.startsWith('/dashboard/orders/import/view-internal-import-receipt/') ||
-                    pathname?.startsWith('/dashboard/orders/import/edit-internal-import-receipt/')
-                      ? 'bg-blue-100 text-blue-700 font-semibold'
-                      : 'text-[#0b08ab] hover:text-blue-700 hover:bg-blue-50'
-                  }`}
+                  href="/orders/import/internal-import-receipts"
+                  className={`block text-xs ml-3 cursor-pointer transition-all py-1 px-2 rounded ${pathname === '/orders/import/internal-import-receipts' ||
+                    pathname === '/orders/import/create-internal-import-receipt' ||
+                    pathname?.startsWith('/orders/import/view-internal-import-receipt/') ||
+                    pathname?.startsWith('/orders/import/edit-internal-import-receipt/')
+                    ? 'bg-blue-100 text-blue-700 font-semibold'
+                    : 'text-[#0b08ab] hover:text-blue-700 hover:bg-blue-50'
+                    }`}
                 >
                   Phiếu nhập kho
                 </Link>
@@ -317,9 +306,8 @@ useEffect(() => {
               height="14"
               viewBox="0 0 14 14"
               fill="none"
-              className={`transition-transform flex-shrink-0 ${
-                expandedMenus.includes('sales') ? 'rotate-180' : ''
-              }`}
+              className={`transition-transform flex-shrink-0 ${expandedMenus.includes('sales') ? 'rotate-180' : ''
+                }`}
             >
               <path d="M3 5L7 9L11 5" stroke="#0b08ab" strokeWidth="1.5" strokeLinecap="round" />
             </svg>
@@ -333,14 +321,13 @@ useEffect(() => {
                 </div>
                 <Link
                   href="/dashboard/products/export-nvbh/export-nvbh-receipts"
-                  className={`block text-xs ml-3 cursor-pointer transition-all py-1 px-2 rounded ${
-                    pathname === '/dashboard/products/export-nvbh/export-nvbh-receipts' ||
+                  className={`block text-xs ml-3 cursor-pointer transition-all py-1 px-2 rounded ${pathname === '/dashboard/products/export-nvbh/export-nvbh-receipts' ||
                     pathname === '/dashboard/products/export-nvbh/create-export-nvbh-receipt' ||
                     pathname?.startsWith('/dashboard/products/export-nvbh/view-export-nvbh-receipt/') ||
                     pathname?.startsWith('/dashboard/products/export-nvbh/edit-export-nvbh-receipt/')
-                      ? 'bg-blue-100 text-blue-700 font-semibold'
-                      : 'text-[#0b08ab] hover:text-blue-700 hover:bg-blue-50'
-                  }`}
+                    ? 'bg-blue-100 text-blue-700 font-semibold'
+                    : 'text-[#0b08ab] hover:text-blue-700 hover:bg-blue-50'
+                    }`}
                 >
                   Phiếu xuất kho
                 </Link>
@@ -350,14 +337,13 @@ useEffect(() => {
                 </div>
                 <Link
                   href="/dashboard/products/import-nvbh/import-nvbh-receipts"
-                  className={`block text-xs ml-3 cursor-pointer transition-all py-1 px-2 rounded ${
-                    pathname === '/dashboard/products/import-nvbh/import-nvbh-receipts' ||
+                  className={`block text-xs ml-3 cursor-pointer transition-all py-1 px-2 rounded ${pathname === '/dashboard/products/import-nvbh/import-nvbh-receipts' ||
                     pathname === '/dashboard/products/import-nvbh/create-import-nvbh-receipt' ||
                     pathname?.startsWith('/dashboard/products/import-nvbh/view-import-nvbh-receipt/') ||
                     pathname?.startsWith('/dashboard/products/import-nvbh/edit-import-nvbh-receipt/')
-                      ? 'bg-blue-100 text-blue-700 font-semibold'
-                      : 'text-[#0b08ab] hover:text-blue-700 hover:bg-blue-50'
-                  }`}
+                    ? 'bg-blue-100 text-blue-700 font-semibold'
+                    : 'text-[#0b08ab] hover:text-blue-700 hover:bg-blue-50'
+                    }`}
                 >
                   Phiếu nhập kho
                 </Link>
@@ -370,15 +356,14 @@ useEffect(() => {
 
         {/* Quản lý kiểm kê */}
         <Link
-          href="/dashboard/inventory/inventory-checks"
-          className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg transition-all group mb-1.5 ${
-            pathname === '/dashboard/inventory/inventory-checks' ||
-            pathname === '/dashboard/inventory/create-inventory-check' ||
-            pathname?.startsWith('/dashboard/inventory/view-inventory-check/') ||
-            pathname?.startsWith('/dashboard/inventory/edit-inventory-check/')
-              ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg scale-[1.02]'
-              : 'hover:bg-blue-50'
-          }`}
+          href="/inventory/inventory-checks"
+          className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg transition-all group mb-1.5 ${pathname === '/inventory/inventory-checks' ||
+            pathname === '/inventory/create-inventory-check' ||
+            pathname?.startsWith('/inventory/view-inventory-check/') ||
+            pathname?.startsWith('/inventory/edit-inventory-check/')
+            ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg scale-[1.02]'
+            : 'hover:bg-blue-50'
+            }`}
         >
           <div className="w-5 h-5 rounded bg-gradient-to-br from-teal-100 to-teal-200 flex items-center justify-center flex-shrink-0">
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
@@ -387,14 +372,13 @@ useEffect(() => {
             </svg>
           </div>
           <span
-            className={`text-sm font-semibold ${
-              pathname === '/dashboard/inventory/inventory-checks' ||
-              pathname === '/dashboard/inventory/create-inventory-check' ||
-              pathname?.startsWith('/dashboard/inventory/view-inventory-check/') ||
-              pathname?.startsWith('/dashboard/inventory/edit-inventory-check/')
-                ? 'text-white'
-                : 'text-[#0b08ab] group-hover:text-blue-700'
-            }`}
+            className={`text-sm font-semibold ${pathname === '/inventory/inventory-checks' ||
+              pathname === '/inventory/create-inventory-check' ||
+              pathname?.startsWith('/inventory/view-inventory-check/') ||
+              pathname?.startsWith('/inventory/edit-inventory-check/')
+              ? 'text-white'
+              : 'text-[#0b08ab] group-hover:text-blue-700'
+              }`}
           >
             Quản lý kiểm kê
           </span>
@@ -421,9 +405,8 @@ useEffect(() => {
               height="14"
               viewBox="0 0 14 14"
               fill="none"
-              className={`transition-transform flex-shrink-0 ${
-                expandedMenus.includes('reports') ? 'rotate-180' : ''
-              }`}
+              className={`transition-transform flex-shrink-0 ${expandedMenus.includes('reports') ? 'rotate-180' : ''
+                }`}
             >
               <path d="M3 5L7 9L11 5" stroke="#0b08ab" strokeWidth="1.5" strokeLinecap="round" />
             </svg>
@@ -464,9 +447,8 @@ useEffect(() => {
               height="14"
               viewBox="0 0 14 14"
               fill="none"
-              className={`transition-transform flex-shrink-0 ${
-                expandedMenus.includes('categories') ? 'rotate-180' : ''
-              }`}
+              className={`transition-transform flex-shrink-0 ${expandedMenus.includes('categories') ? 'rotate-180' : ''
+                }`}
             >
               <path d="M3 5L7 9L11 5" stroke="#0b08ab" strokeWidth="1.5" strokeLinecap="round" />
             </svg>
@@ -475,28 +457,25 @@ useEffect(() => {
             <div className="ml-8 space-y-1 mt-1 animate-fade-in">
               <div className="border-l-2 border-green-200 pl-3 py-1.5 space-y-1.5">
                 <Link
-                  href="/dashboard/categories/suppliers"
-                  className={`block text-xs cursor-pointer transition-all py-1 px-2 rounded ${
-                    pathname === '/dashboard/categories/suppliers' ||
-                    pathname === '/dashboard/categories/suppliers/create' ||
-                    pathname?.startsWith('/dashboard/categories/suppliers/edit/')
-                      ? 'bg-blue-100 text-blue-700 font-semibold'
-                      : 'text-[#0b08ab] hover:text-blue-700 hover:bg-blue-50'
-                  }`}
+                  href="/categories/suppliers"
+                  className={`block text-xs cursor-pointer transition-all py-1 px-2 rounded ${pathname === '/categories/suppliers' ||
+                    pathname === '/categories/suppliers/create' ||
+                    pathname?.startsWith('/categories/suppliers/edit/')
+                    ? 'bg-blue-100 text-blue-700 font-semibold'
+                    : 'text-[#0b08ab] hover:text-blue-700 hover:bg-blue-50'
+                    }`}
                 >
                   Nguồn hàng xuất/nhập
                 </Link>
 
-                {/* Trang sản phẩm tổng – chỗ này anh có thể cho về /products nếu anh dùng route đó */}
                 <Link
                   href="/dashboard/products"
-                  className={`block text-xs cursor-pointer transition-all py-1 px-2 rounded ${
-                    pathname === '/dashboard/products' ||
+                  className={`block text-xs cursor-pointer transition-all py-1 px-2 rounded ${pathname === '/dashboard/products' ||
                     pathname === '/dashboard/products/create' ||
                     pathname?.startsWith('/dashboard/products/edit/')
-                      ? 'bg-blue-100 text-blue-700 font-semibold'
-                      : 'text-[#0b08ab] hover:text-blue-700 hover:bg-blue-50'
-                  }`}
+                    ? 'bg-blue-100 text-blue-700 font-semibold'
+                    : 'text-[#0b08ab] hover:text-blue-700 hover:bg-blue-50'
+                    }`}
                 >
                   Danh mục hàng hóa
                 </Link>

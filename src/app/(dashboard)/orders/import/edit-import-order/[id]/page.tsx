@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import Header from '@/src/app/components/layout/Header';
-import Sidebar from '@/src/app/components/layout/Sidebar';
+import Header from '@/components/layout/Header';
+import Sidebar from '@/components/layout/Sidebar';
 
 
 interface ProductItem {

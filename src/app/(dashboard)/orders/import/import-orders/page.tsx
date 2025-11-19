@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Header from '@/src/app/components/layout/Header';
-import Sidebar from '@/src/app/components/layout/Sidebar';
+import Header from '@/components/layout/Header';
+import Sidebar from '@/components/layout/Sidebar';
 
 type OrderStatus = 'pending' | 'approved' | 'rejected' | 'imported';
 
@@ -139,7 +139,7 @@ export default function InternalImportOrdersPage() {
                             Tìm kiếm
                         </button>
                         <button
-                            onClick={() => router.push('/dashboard/orders/import/create-import-order')}
+                            onClick={() => router.push('/orders/import/create-import-order')}
                             className="px-6 py-2 bg-[#0046ff] hover:bg-[#0039cc] text-white rounded-lg transition-colors flex items-center gap-2 shadow-lg"
                         >
                             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -212,7 +212,7 @@ export default function InternalImportOrdersPage() {
                                         <td className="px-4">
                                             <div className="flex items-center justify-center gap-3">
                                                 <button
-                                                    onClick={() => router.push(`/dashboard/orders/import/view-import-order/${record.id}`)}
+                                                    onClick={() => router.push(`/orders/import/view-import-order/${record.id}`)}
                                                     className="hover:scale-110 transition-transform"
                                                     title="Xem chi tiết"
                                                 >
@@ -222,7 +222,7 @@ export default function InternalImportOrdersPage() {
                                                     </svg>
                                                 </button>
                                                 <button
-                                                    onClick={() => router.push(`/dashboard/orders/import/edit-import-order/${record.id}`)}
+                                                    onClick={() => router.push(`/orders/import/edit-import-order/${record.id}`)}
                                                     className="hover:scale-110 transition-transform"
                                                     title="Chỉnh sửa"
                                                 >

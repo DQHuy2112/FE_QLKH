@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Header from '@/src/app/components/layout/Header';
-import Sidebar from '@/src/app/components/layout/Sidebar';
+import Header from '@/components/layout/Header';
+import Sidebar from '@/components/layout/Sidebar';
 
 type CheckStatus = 'pending' | 'approved' | 'completed';
 
@@ -100,7 +100,7 @@ export default function InventoryChecksPage() {
                             Tìm kiếm
                         </button>
                         <button
-                            onClick={() => router.push('/dashboard/inventory/create-inventory-check')}
+                            onClick={() => router.push('/inventory/create-inventory-check')}
                             className="px-6 py-2 bg-[#0046ff] hover:bg-[#0039cc] text-white rounded-lg transition-colors flex items-center gap-2 shadow-lg"
                         >
                             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -140,7 +140,7 @@ export default function InventoryChecksPage() {
                                         <td className="px-4">
                                             <div className="flex items-center justify-center gap-3">
                                                 <button
-                                                    onClick={() => router.push(`/dashboard/inventory/view-inventory-check/${record.id}`)}
+                                                    onClick={() => router.push(`/inventory/view-inventory-check/${record.id}`)}
                                                     className="hover:scale-110 transition-transform"
                                                     title="Xem chi tiết"
                                                 >
@@ -150,7 +150,7 @@ export default function InventoryChecksPage() {
                                                     </svg>
                                                 </button>
                                                 <button
-                                                    onClick={() => router.push(`/dashboard/inventory/edit-inventory-check/${record.id}`)}
+                                                    onClick={() => router.push(`/inventory/edit-inventory-check/${record.id}`)}
                                                     className="hover:scale-110 transition-transform"
                                                     title="Chỉnh sửa"
                                                 >

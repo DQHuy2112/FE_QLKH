@@ -1,39 +1,244 @@
 'use client';
 
-import Header from '@/src/app/components/layout/Header';
-import Sidebar from '@/src/app/components/layout/Sidebar';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 
+import Header from '@/components/layout/Header';
+import Sidebar from '@/components/layout/Sidebar';
+
+import {
+    getSuppliers,
+    type Supplier,
+} from '@/services/supplier.service';
+
+import {
+    createSupplierExport,
+    type SupplierExportCreateRequest,
+} from '@/services/inventory.service';
 
 interface ProductItem {
-    id: number;
+    id: number;             // STT / row
+    productId: number;      // map với shop_products.products_id
+    importDetailId: number; // map với shop_import_details.import_details_id
     name: string;
     code: string;
     unit: string;
-    price: string;
-    quantity: string;
-    discount: string;
-    total: string;
+    price: string;          // hiển thị, dạng "30.000.000"
+    quantity: string;       // hiển thị
+    discount: string;       // "5%" hoặc "5"
+    total: string;          // hiển thị
 }
 
+const formatCurrency = (value: number) =>
+    value.toLocaleString('vi-VN', { maximumFractionDigits: 0 });
+
+const parseNumber = (value: string): number => {
+    const cleaned = value.replace(/[^\d]/g, '');
+    return cleaned ? Number(cleaned) : 0;
+};
+
 export default function TaoPhieuXuatKho() {
+    const router = useRouter();
+
+    // ====== NCC / nguồn nhận ======
+    const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+    const [selectedSupplierId, setSelectedSupplierId] = useState<number | ''>('');
+
+    // ====== Thông tin chung ======
+    const [phone, setPhone] = useState('');
+    const [address, setAddress] = useState('');
+    const [reason, setReason] = useState(''); // lý do xuất
+    const [note, setNote] = useState('');     // ghi chú / mô tả hợp đồng / khác
+
+    // ====== Hàng hóa ======
     const [products, setProducts] = useState<ProductItem[]>([
-        { id: 1, name: 'ĐT Samsung Galaxy Z', code: 'XXXXX', unit: 'Cái', price: '30.000.000', quantity: '10', discount: '5%', total: '285.000.000' },
-        { id: 2, name: 'ĐT Xiaomi Redmi 10', code: 'XXXXX', unit: 'Cái', price: '3.998.000', quantity: '10', discount: '', total: '39.980.000' },
-        { id: 3, name: 'ĐT Iphone 13 Promax', code: 'XXXXX', unit: 'Cái', price: '40.000.000', quantity: '5', discount: '5%', total: '78.154.168' },
-        { id: 4, name: 'Tai nghe Xiaomi', code: 'XXXXX', unit: 'Cái', price: '200.000', quantity: '4', discount: '', total: '800.000' },
-        { id: 5, name: 'Tai nghe Oppo Renco', code: 'XXXXX', unit: 'Cái', price: '790.000', quantity: '', discount: '', total: '' },
+        // Dùng productId = 1, importDetailId = 1/2/3… cho mục đích test.
+        // Sau này bạn thay các id này bằng id thật khi chọn hàng từ hệ thống.
+        {
+            id: 1,
+            productId: 1,
+            importDetailId: 1,
+            name: 'ĐT Samsung Galaxy Z',
+            code: 'P001',
+            unit: 'Cái',
+            price: '30.000.000',
+            quantity: '10',
+            discount: '5',
+            total: '285.000.000',
+        },
+        {
+            id: 2,
+            productId: 1,
+            importDetailId: 2,
+            name: 'ĐT Xiaomi Redmi 10',
+            code: 'P002',
+            unit: 'Cái',
+            price: '3.998.000',
+            quantity: '10',
+            discount: '',
+            total: '39.980.000',
+        },
+        {
+            id: 3,
+            productId: 1,
+            importDetailId: 3,
+            name: 'ĐT Iphone 13 Promax',
+            code: 'P003',
+            unit: 'Cái',
+            price: '40.000.000',
+            quantity: '5',
+            discount: '5',
+            total: '78.154.168',
+        },
+        {
+            id: 4,
+            productId: 1,
+            importDetailId: 4,
+            name: 'Tai nghe Xiaomi',
+            code: 'P004',
+            unit: 'Cái',
+            price: '200.000',
+            quantity: '4',
+            discount: '',
+            total: '800.000',
+        },
+        {
+            id: 5,
+            productId: 1,
+            importDetailId: 5,
+            name: 'Tai nghe Oppo Renco',
+            code: 'P005',
+            unit: 'Cái',
+            price: '790.000',
+            quantity: '',
+            discount: '',
+            total: '',
+        },
     ]);
 
+    const [loadingSuppliers, setLoadingSuppliers] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [success, setSuccess] = useState<string | null>(null);
+
+    // ====== Load NCC ======
+    useEffect(() => {
+        const fetchSuppliers = async () => {
+            try {
+                setLoadingSuppliers(true);
+                const list = await getSuppliers();
+                setSuppliers(list);
+            } catch (e) {
+                console.error(e);
+                setError(
+                    e instanceof Error
+                        ? e.message
+                        : 'Có lỗi xảy ra khi tải danh sách nhà cung cấp',
+                );
+            } finally {
+                setLoadingSuppliers(false);
+            }
+        };
+
+        fetchSuppliers();
+    }, []);
+
+    // ====== Tính toán ======
+    const recalcRowTotal = (item: ProductItem): ProductItem => {
+        const price = parseNumber(item.price);
+        const qty = parseNumber(item.quantity);
+        const discountPercent = parseNumber(item.discount); // 5 => 5%
+
+        let total = price * qty;
+        if (discountPercent > 0) {
+            total = (total * (100 - discountPercent)) / 100;
+        }
+
+        return {
+            ...item,
+            total: total > 0 ? formatCurrency(total) : '',
+        };
+    };
+
+    const handleChangeProductField = (
+        id: number,
+        field: keyof ProductItem,
+        value: string,
+    ) => {
+        setProducts((prev) =>
+            prev.map((p) => {
+                if (p.id !== id) return p;
+                const updated: ProductItem = { ...p, [field]: value } as ProductItem;
+                return recalcRowTotal(updated);
+            }),
+        );
+    };
+
     const calculateTotal = () => {
-        return products.reduce((sum, item) => {
-            const total = item.total ? parseInt(item.total.replace(/\./g, '')) : 0;
-            return sum + total;
-        }, 0).toLocaleString('vi-VN');
+        const sum = products.reduce((acc, item) => {
+            const total = parseNumber(item.total);
+            return acc + total;
+        }, 0);
+        return formatCurrency(sum);
     };
 
     const deleteProduct = (id: number) => {
-        setProducts(products.filter(p => p.id !== id));
+        setProducts((prev) => prev.filter((p) => p.id !== id));
+    };
+
+    // ====== Submit tạo phiếu ======
+    const handleSave = async () => {
+        try {
+            setError(null);
+            setSuccess(null);
+
+            if (!selectedSupplierId) {
+                setError('Vui lòng chọn nguồn nhận / nhà cung cấp');
+                return;
+            }
+
+            const items = products
+                .filter((p) => parseNumber(p.quantity) > 0 && parseNumber(p.price) > 0)
+                .map((p) => ({
+                    importDetailId: p.importDetailId,
+                    productId: p.productId,
+                    quantity: parseNumber(p.quantity),
+                    unitPrice: parseNumber(p.price),
+                }));
+
+            if (items.length === 0) {
+                setError('Vui lòng nhập ít nhất 1 hàng hóa có số lượng > 0');
+                return;
+            }
+
+            const payload: SupplierExportCreateRequest = {
+                // code: undefined -> BE tự sinh
+                storeId: 1, // TODO: nếu bạn có store hiện tại thì thay ở đây
+                supplierId: selectedSupplierId as number,
+                note: note || undefined,
+                description: reason || undefined,
+                items,
+            };
+
+            setSaving(true);
+            const created = await createSupplierExport(payload);
+
+            setSuccess(`Tạo phiếu xuất kho thành công (Mã: ${created.code ?? created.id})`);
+
+            // chuyển về danh sách phiếu xuất NCC sau 1 chút
+            setTimeout(() => {
+                router.push('/dashboard/products/export/export-receipts');
+            }, 800);
+        } catch (e) {
+            console.error(e);
+            setError(
+                e instanceof Error
+                    ? e.message
+                    : 'Có lỗi xảy ra khi tạo phiếu xuất kho',
+            );
+        } finally {
+            setSaving(false);
+        }
     };
 
     return (
@@ -49,7 +254,19 @@ export default function TaoPhieuXuatKho() {
                     </p>
                 </div>
 
-                {/* Action Buttons */}
+                {/* Thông báo */}
+                {error && (
+                    <div className="mb-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded px-4 py-2">
+                        {error}
+                    </div>
+                )}
+                {success && (
+                    <div className="mb-4 text-sm text-green-700 bg-green-50 border border-green-200 rounded px-4 py-2">
+                        {success}
+                    </div>
+                )}
+
+                {/* Action Buttons (thêm hàng) */}
                 <div className="flex gap-4 mb-6">
                     <button className="px-6 py-2.5 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-lg font-bold text-sm shadow-lg transition-all">
                         + Thêm hàng<br />từ hệ thống
@@ -73,11 +290,35 @@ export default function TaoPhieuXuatKho() {
                                 <div className="flex items-center gap-3">
                                     <label className="w-28 text-sm">Nguồn nhận</label>
                                     <div className="flex-1 relative">
-                                        <select className="w-full px-3 py-1.5 border border-blue-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none bg-white">
-                                            <option>Chọn nguồn nhận</option>
+                                        <select
+                                            className="w-full px-3 py-1.5 border border-blue-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none bg-white"
+                                            disabled={loadingSuppliers}
+                                            value={selectedSupplierId === '' ? '' : String(selectedSupplierId)}
+                                            onChange={(e) =>
+                                                setSelectedSupplierId(
+                                                    e.target.value ? Number(e.target.value) : '',
+                                                )
+                                            }
+                                        >
+                                            <option value="">Chọn nguồn nhận</option>
+                                            {suppliers.map((s) => (
+                                                <option key={s.id} value={s.id}>
+                                                    {s.name}
+                                                </option>
+                                            ))}
                                         </select>
-                                        <svg className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                        <svg
+                                            className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            viewBox="0 0 24 24"
+                                        >
+                                            <path
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                strokeWidth={2}
+                                                d="M19 9l-7 7-7-7"
+                                            />
                                         </svg>
                                     </div>
                                 </div>
@@ -88,20 +329,39 @@ export default function TaoPhieuXuatKho() {
                                         <select className="w-full px-3 py-1.5 border border-blue-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none bg-white">
                                             <option>Chọn mã nguồn</option>
                                         </select>
-                                        <svg className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                        <svg
+                                            className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            viewBox="0 0 24 24"
+                                        >
+                                            <path
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                strokeWidth={2}
+                                                d="M19 9l-7 7-7-7"
+                                            />
                                         </svg>
                                     </div>
                                 </div>
 
                                 <div className="flex items-center gap-3">
                                     <label className="w-28 text-sm">Số điện thoại</label>
-                                    <input type="text" className="flex-1 px-3 py-1.5 border border-blue-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                    <input
+                                        type="text"
+                                        className="flex-1 px-3 py-1.5 border border-blue-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        value={phone}
+                                        onChange={(e) => setPhone(e.target.value)}
+                                    />
                                 </div>
 
                                 <div className="flex items-start gap-3">
                                     <label className="w-28 text-sm pt-2">Địa chỉ</label>
-                                    <textarea className="flex-1 px-3 py-2 border border-blue-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 h-14 resize-none"></textarea>
+                                    <textarea
+                                        className="flex-1 px-3 py-2 border border-blue-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 h-14 resize-none"
+                                        value={address}
+                                        onChange={(e) => setAddress(e.target.value)}
+                                    />
                                 </div>
                             </div>
 
@@ -113,15 +373,29 @@ export default function TaoPhieuXuatKho() {
                                         <select className="w-full px-3 py-1.5 border border-gray-400 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none bg-gray-200">
                                             <option>Tự động tạo</option>
                                         </select>
-                                        <svg className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                        <svg
+                                            className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            viewBox="0 0 24 24"
+                                        >
+                                            <path
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                strokeWidth={2}
+                                                d="M19 9l-7 7-7-7"
+                                            />
                                         </svg>
                                     </div>
                                 </div>
 
                                 <div className="flex items-start gap-3">
                                     <label className="w-28 text-sm pt-2">Lý do xuất</label>
-                                    <textarea className="flex-1 px-3 py-2 border border-blue-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 h-14 resize-none"></textarea>
+                                    <textarea
+                                        className="flex-1 px-3 py-2 border border-blue-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 h-14 resize-none"
+                                        value={reason}
+                                        onChange={(e) => setReason(e.target.value)}
+                                    />
                                 </div>
                             </div>
                         </div>
@@ -138,35 +412,105 @@ export default function TaoPhieuXuatKho() {
                                     <th className="px-2 text-center font-bold text-sm w-20">Đơn vị tính</th>
                                     <th className="px-2 text-center font-bold text-sm w-28">Đơn giá</th>
                                     <th className="px-2 text-center font-bold text-sm w-20">Số lượng</th>
-                                    <th className="px-2 text-center font-bold text-sm w-24">Chiết khấu</th>
+                                    <th className="px-2 text-center font-bold text-sm w-24">Chiết khấu (%)</th>
                                     <th className="px-2 text-center font-bold text-sm w-28">Thành tiền</th>
                                     <th className="px-2 text-center font-bold text-sm w-16">Xóa</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {products.map((product) => (
-                                    <tr key={product.id} className="border border-gray-400 h-12 hover:bg-gray-50">
-                                        <td className="px-2 text-center text-sm border-r border-gray-400">{product.id}</td>
-                                        <td className="px-2 text-right text-sm border-r border-gray-400">{product.name}</td>
-                                        <td className="px-2 text-center text-sm border-r border-gray-400">{product.code}</td>
-                                        <td className="px-2 text-center text-sm border-r border-gray-400">{product.unit}</td>
-                                        <td className="px-2 text-right text-sm border-r border-gray-400">{product.price}</td>
-                                        <td className="px-2 text-center text-sm border-r border-gray-400">{product.quantity}</td>
-                                        <td className="px-2 text-right text-sm border-r border-gray-400">{product.discount}</td>
-                                        <td className="px-2 text-right text-sm font-medium border-r border-gray-400">{product.total}</td>
+                                    <tr
+                                        key={product.id}
+                                        className="border border-gray-400 h-12 hover:bg-gray-50"
+                                    >
+                                        <td className="px-2 text-center text-sm border-r border-gray-400">
+                                            {product.id}
+                                        </td>
+                                        <td className="px-2 text-left text-sm border-r border-gray-400">
+                                            {product.name}
+                                        </td>
+                                        <td className="px-2 text-center text-sm border-r border-gray-400">
+                                            {product.code}
+                                        </td>
+                                        <td className="px-2 text-center text-sm border-r border-gray-400">
+                                            {product.unit}
+                                        </td>
+                                        <td className="px-2 text-right text-sm border-r border-gray-400">
+                                            <input
+                                                className="w-full text-right bg-transparent focus:outline-none"
+                                                value={product.price}
+                                                onChange={(e) =>
+                                                    handleChangeProductField(
+                                                        product.id,
+                                                        'price',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </td>
+                                        <td className="px-2 text-center text-sm border-r border-gray-400">
+                                            <input
+                                                className="w-full text-center bg-transparent focus:outline-none"
+                                                value={product.quantity}
+                                                onChange={(e) =>
+                                                    handleChangeProductField(
+                                                        product.id,
+                                                        'quantity',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </td>
+                                        <td className="px-2 text-center text-sm border-r border-gray-400">
+                                            <input
+                                                className="w-full text-center bg-transparent focus:outline-none"
+                                                value={product.discount}
+                                                onChange={(e) =>
+                                                    handleChangeProductField(
+                                                        product.id,
+                                                        'discount',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </td>
+                                        <td className="px-2 text-right text-sm font-medium border-r border-gray-400">
+                                            {product.total}
+                                        </td>
                                         <td className="px-2 text-center border-r border-gray-400">
-                                            <button onClick={() => deleteProduct(product.id)} className="hover:scale-110 transition-transform">
-                                                <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-                                                    <path d="M3 6H19M8 6V4C8 3.44772 8.44772 3 9 3H13C13.5523 3 14 3.44772 14 4V6M17 6V18C17 18.5523 16.5523 19 16 19H6C5.44772 19 5 18.5523 5 18V6H17Z" stroke="#f90606" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                            <button
+                                                onClick={() => deleteProduct(product.id)}
+                                                className="hover:scale-110 transition-transform"
+                                            >
+                                                <svg
+                                                    width="22"
+                                                    height="22"
+                                                    viewBox="0 0 22 22"
+                                                    fill="none"
+                                                >
+                                                    <path
+                                                        d="M3 6H19M8 6V4C8 3.44772 8.44772 3 9 3H13C13.5523 3 14 3.44772 14 4V6M17 6V18C17 18.5523 16.5523 19 16 19H6C5.44772 19 5 18.5523 5 18V6H17Z"
+                                                        stroke="#f90606"
+                                                        strokeWidth="2"
+                                                        strokeLinecap="round"
+                                                        strokeLinejoin="round"
+                                                    />
                                                 </svg>
                                             </button>
                                         </td>
                                     </tr>
                                 ))}
                                 <tr className="border border-gray-400 h-12 bg-white">
-                                    <td colSpan={7} className="px-2 text-center font-bold text-sm border-r border-gray-400">Tổng</td>
-                                    <td className="px-2 text-right font-bold text-sm border-r border-gray-400">{calculateTotal()}</td>
-                                    <td className="border-r border-gray-400"></td>
+                                    <td
+                                        colSpan={7}
+                                        className="px-2 text-center font-bold text-sm border-r border-gray-400"
+                                    >
+                                        Tổng
+                                    </td>
+                                    <td className="px-2 text-right font-bold text-sm border-r border-gray-400">
+                                        {calculateTotal()}
+                                    </td>
+                                    <td className="border-r border-gray-400" />
                                 </tr>
                             </tbody>
                         </table>
@@ -176,22 +520,45 @@ export default function TaoPhieuXuatKho() {
                     <div className="border-4 border-gray-400 bg-gray-100 p-6 mb-6 rounded">
                         <div className="flex items-center gap-4 mb-4">
                             <svg width="25" height="25" viewBox="0 0 25 25" fill="none">
-                                <path d="M7 3H17C18.1046 3 19 3.89543 19 5V21L12 17L5 21V5C5 3.89543 5.89543 3 7 3Z" stroke="#000" strokeWidth="2" />
+                                <path
+                                    d="M7 3H17C18.1046 3 19 3.89543 19 5V21L12 17L5 21V5C5 3.89543 5.89543 3 7 3Z"
+                                    stroke="#000"
+                                    strokeWidth="2"
+                                />
                             </svg>
                             <h3 className="text-sm font-bold">Hợp đồng</h3>
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                             <div>
                                 <label className="block text-sm mb-2">Nội dung</label>
-                                <input type="text" className="w-full px-3 py-1.5 border border-blue-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                <input
+                                    type="text"
+                                    className="w-full px-3 py-1.5 border border-blue-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    value={note}
+                                    onChange={(e) => setNote(e.target.value)}
+                                />
                             </div>
                             <div>
                                 <label className="block text-sm mb-2">Hình ảnh</label>
                                 <div className="flex gap-2">
-                                    <input type="text" className="flex-1 px-3 py-1.5 border border-blue-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                    <input
+                                        type="text"
+                                        className="flex-1 px-3 py-1.5 border border-blue-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    />
                                     <button className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 rounded shadow-lg transition-colors">
-                                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                                            <path d="M4 14V16C4 17.1046 4.89543 18 6 18H14C15.1046 18 16 17.1046 16 16V14M10 2V14M10 2L6 6M10 2L14 6" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                        <svg
+                                            width="20"
+                                            height="20"
+                                            viewBox="0 0 20 20"
+                                            fill="none"
+                                        >
+                                            <path
+                                                d="M4 14V16C4 17.1046 4.89543 18 6 18H14C15.1046 18 16 17.1046 16 16V14M10 2V14M10 2L6 6M10 2L14 6"
+                                                stroke="white"
+                                                strokeWidth="2"
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                            />
                                         </svg>
                                     </button>
                                 </div>
@@ -203,23 +570,53 @@ export default function TaoPhieuXuatKho() {
                     <div className="border-4 border-gray-400 bg-gray-100 p-6 mb-6 rounded">
                         <div className="flex items-center gap-4 mb-4">
                             <svg width="25" height="25" viewBox="0 0 25 25" fill="none">
-                                <rect x="5" y="3" width="14" height="18" rx="1" stroke="#000" strokeWidth="2" />
-                                <path d="M9 7H15M9 11H15M9 15H13" stroke="#000" strokeWidth="2" strokeLinecap="round" />
+                                <rect
+                                    x="5"
+                                    y="3"
+                                    width="14"
+                                    height="18"
+                                    rx="1"
+                                    stroke="#000"
+                                    strokeWidth="2"
+                                />
+                                <path
+                                    d="M9 7H15M9 11H15M9 15H13"
+                                    stroke="#000"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                />
                             </svg>
                             <h3 className="text-sm font-bold">Sở cứ</h3>
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                             <div>
                                 <label className="block text-sm mb-2">Nội dung</label>
-                                <input type="text" className="w-full px-3 py-1.5 border border-blue-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                <input
+                                    type="text"
+                                    className="w-full px-3 py-1.5 border border-blue-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                />
                             </div>
                             <div>
                                 <label className="block text-sm mb-2">Hình ảnh</label>
                                 <div className="flex gap-2">
-                                    <input type="text" className="flex-1 px-3 py-1.5 border border-blue-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                    <input
+                                        type="text"
+                                        className="flex-1 px-3 py-1.5 border border-blue-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    />
                                     <button className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 rounded shadow-lg transition-colors">
-                                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                                            <path d="M4 14V16C4 17.1046 4.89543 18 6 18H14C15.1046 18 16 17.1046 16 16V14M10 2V14M10 2L6 6M10 2L14 6" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                        <svg
+                                            width="20"
+                                            height="20"
+                                            viewBox="0 0 20 20"
+                                            fill="none"
+                                        >
+                                            <path
+                                                d="M4 14V16C4 17.1046 4.89543 18 6 18H14C15.1046 18 16 17.1046 16 16V14M10 2V14M10 2L6 6M10 2L14 6"
+                                                stroke="white"
+                                                strokeWidth="2"
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                            />
                                         </svg>
                                     </button>
                                 </div>
@@ -229,11 +626,20 @@ export default function TaoPhieuXuatKho() {
 
                     {/* Action Buttons */}
                     <div className="flex justify-end gap-6">
-                        <button className="px-8 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold text-sm shadow-lg transition-colors">
+                        <button
+                            className="px-8 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold text-sm shadow-lg transition-colors"
+                            onClick={() =>
+                                router.push('/dashboard/products/export/export-receipts')
+                            }
+                        >
                             Hủy
                         </button>
-                        <button className="px-8 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-sm shadow-lg transition-colors">
-                            Lưu
+                        <button
+                            className="px-8 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-sm shadow-lg transition-colors disabled:opacity-60"
+                            onClick={handleSave}
+                            disabled={saving}
+                        >
+                            {saving ? 'Đang lưu...' : 'Lưu'}
                         </button>
                     </div>
                 </div>

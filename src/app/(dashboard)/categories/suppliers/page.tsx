@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Header from '@/src/app/components/layout/Header';
-import Sidebar from '@/src/app/components/layout/Sidebar';
+import Header from '@/components/layout/Header';
+import Sidebar from '@/components/layout/Sidebar';
 
 interface Supplier {
     id: number;
@@ -111,7 +111,7 @@ export default function QuanLyNguonHang() {
                             Tìm kiếm
                         </button>
                         <button
-                            onClick={() => router.push('/dashboard/categories/suppliers/create')}
+                            onClick={() => router.push('/categories/suppliers/create')}
                             className="px-6 py-2 bg-[#0046ff] hover:bg-[#0039cc] text-white rounded-lg transition-colors flex items-center gap-2 shadow-lg"
                         >
                             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">

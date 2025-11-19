@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Header from '@/src/app/components/layout/Header';
-import Sidebar from '@/src/app/components/layout/Sidebar';
+import Header from '@/components/layout/Header';
+import Sidebar from '@/components/layout/Sidebar';
 
 type ExportStatus = 'pending' | 'approved' | 'rejected' | 'exported' | 'returned';
 
@@ -150,7 +150,7 @@ export default function PhieuXuatKhoNoiBo() {
                             Tìm kiếm
                         </button>
                         <button
-                            onClick={() => router.push('/dashboard/orders/export/create-internal-export-receipt')}
+                            onClick={() => router.push('/orders/export/create-internal-export-receipt')}
                             className="px-6 py-2 bg-[#0046ff] hover:bg-[#0039cc] text-white rounded-lg transition-colors flex items-center gap-2 shadow-lg"
                         >
                             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -223,7 +223,7 @@ export default function PhieuXuatKhoNoiBo() {
                                         <td className="px-4">
                                             <div className="flex items-center justify-center gap-3">
                                                 <button
-                                                    onClick={() => router.push(`/dashboard/orders/export/view-internal-export-receipt/${record.id}`)}
+                                                    onClick={() => router.push(`/orders/export/view-internal-export-receipt/${record.id}`)}
                                                     className="hover:scale-110 transition-transform"
                                                     title="Xem chi tiết"
                                                 >
@@ -233,7 +233,7 @@ export default function PhieuXuatKhoNoiBo() {
                                                     </svg>
                                                 </button>
                                                 <button
-                                                    onClick={() => router.push(`/dashboard/orders/export/edit-internal-export-receipt/${record.id}`)}
+                                                    onClick={() => router.push(`/orders/export/edit-internal-export-receipt/${record.id}`)}
                                                     className="hover:scale-110 transition-transform"
                                                     title="Chỉnh sửa"
                                                 >
