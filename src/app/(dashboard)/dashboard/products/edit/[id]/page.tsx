@@ -24,9 +24,10 @@ import { getSuppliers, type Supplier } from '@/services/supplier.service';
 
 const UNIT_OPTIONS = ['Cái', 'Chiếc', 'Bộ', 'Hộp', 'Thùng'];
 
-// ===== BASE URL cho ảnh từ BE =====
+// ===== BASE URL cho ảnh từ BE (qua API Gateway) =====
 const API_BASE_URL = 'http://localhost:8080';
 
+// Build full URL để hiển thị ảnh
 function buildImageUrl(path: string | null | undefined): string | null {
   if (!path) return null;
   if (path.startsWith('http://') || path.startsWith('https://')) return path;
@@ -67,9 +68,10 @@ export default function EditProductPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [currentImagePath, setCurrentImagePath] = useState<string | null>(null);
+  // ===== STATE ẢNH =====
+  const [imageFile, setImageFile] = useState<File | null>(null);      // file mới nếu user chọn
+  const [imagePreview, setImagePreview] = useState<string | null>(null); // URL để show <img>
+  const [currentImagePath, setCurrentImagePath] = useState<string | null>(null); // path lưu trong DB, ví dụ /uploads/products/xxx.jpg
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -123,10 +125,10 @@ export default function EditProductPage() {
         );
         setSupplierId(product.supplierId ?? '');
 
-        // lưu path gốc + preview bằng full URL
-        const originalPath = product.image ?? null;
+        // ===== ẢNH HIỆN TẠI =====
+        const originalPath = product.image ?? null;  // ví dụ "/uploads/products/abc.jpg"
         setCurrentImagePath(originalPath);
-        setImagePreview(buildImageUrl(originalPath));
+        setImagePreview(buildImageUrl(originalPath)); // build full url để show
       } catch (e) {
         const msg =
           e instanceof Error
@@ -158,16 +160,16 @@ export default function EditProductPage() {
 
       let imagePath: string | null = currentImagePath;
 
-      // nếu chọn ảnh mới thì upload, override ảnh cũ
+      // Nếu user chọn ảnh mới -> upload lên BE, path mới ghi đè ảnh cũ
       if (imageFile) {
-        imagePath = await uploadProductImage(imageFile);
+        imagePath = await uploadProductImage(imageFile); // BE trả về "/uploads/products/xxx.jpg"
       }
 
       const payload: ProductPayload = {
         code,
         name,
         shortDescription: description,
-        image: imagePath,
+        image: imagePath, // gửi path ảnh lên BE
         unitPrice: parseMoney(price),
         quantity: quantity === '' ? 0 : Number(quantity),
         minStock: stockMin === '' ? null : Number(stockMin),
@@ -190,15 +192,18 @@ export default function EditProductPage() {
     }
   };
 
+  // ===== HANDLE CHỌN ẢNH =====
   const handleImageChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] ?? null;
     setImageFile(file);
 
     if (file) {
+      // preview ảnh mới (blob local)
       const url = URL.createObjectURL(file);
-      setImagePreview(url);            // ảnh mới (blob URL)
+      setImagePreview(url);
     } else {
-      setImagePreview(buildImageUrl(currentImagePath)); // quay lại ảnh cũ
+      // nếu bỏ chọn -> quay lại ảnh cũ từ server
+      setImagePreview(buildImageUrl(currentImagePath));
     }
   };
 
