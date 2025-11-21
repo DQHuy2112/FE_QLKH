@@ -367,6 +367,9 @@ export default function ProductsPage() {
                       <th className="px-4 text-center font-bold text-sm">
                         Đơn vị tính
                       </th>
+                      <th className="px-4 text-center font-bold text-sm">
+                        Tồn kho
+                      </th>
                       <th
                         className="px-4 text-center font-bold text-sm cursor-pointer select-none"
                         onClick={() => handleSort('unitPrice')}
@@ -430,6 +433,9 @@ export default function ProductsPage() {
                             {supplierName}
                           </td>
                           <td className="px-4 text-center text-sm">Cái</td>
+                          <td className="px-4 text-center text-sm font-semibold">
+                            {product.quantity ?? 0}
+                          </td>
                           <td className="px-4 text-center text-sm">
                             {formatPrice(product.unitPrice)}
                           </td>
@@ -532,7 +538,7 @@ export default function ProductsPage() {
                     {pageItems.length === 0 && (
                       <tr>
                         <td
-                          colSpan={9} // 👈 9 cột
+                          colSpan={10} // 👈 10 cột (thêm cột Tồn kho)
                           className="px-4 py-4 text-center text-sm text-gray-500"
                         >
                           Không có dữ liệu

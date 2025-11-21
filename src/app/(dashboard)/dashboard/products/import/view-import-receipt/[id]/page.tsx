@@ -44,23 +44,27 @@ export default function ViewImportReceipt() {
             try {
                 setLoading(true);
 
-                // Lấy NCC + phiếu nhập song song
-                const [suppliers, importData] = await Promise.all([
-                    getSuppliers(),
-                    getSupplierImportById(id),
-                ]);
+                // Lấy phiếu nhập
+                const importData = await getSupplierImportById(id);
 
-                // ---- map lại thông tin NCC ----
-                const sp = suppliers.find(
-                    (s: Supplier) => s.id === importData.supplierId,
-                );
+                // ---- Fetch thông tin NCC ----
+                let supplier: Supplier | null = null;
+                if (importData.supplierId) {
+                    try {
+                        const suppliers = await getSuppliers('NCC');
+                        supplier = suppliers.find((s: Supplier) => s.id === importData.supplierId) ?? null;
+                        console.log('🏪 Found supplier:', supplier);
+                    } catch (err) {
+                        console.error('Failed to fetch suppliers:', err);
+                    }
+                }
 
                 const mappedImport: SupplierImport = {
                     ...importData,
-                    supplierName: sp?.name ?? importData.supplierName ?? null,
-                    supplierCode: sp?.code ?? importData.supplierCode ?? null,
-                    supplierPhone: sp?.phone ?? importData.supplierPhone ?? null,
-                    supplierAddress: sp?.address ?? importData.supplierAddress ?? null,
+                    supplierName: supplier?.name ?? importData.supplierName ?? null,
+                    supplierCode: supplier?.code ?? importData.supplierCode ?? null,
+                    supplierPhone: supplier?.phone ?? importData.supplierPhone ?? null,
+                    supplierAddress: supplier?.address ?? importData.supplierAddress ?? null,
                 };
 
                 setData(mappedImport);
@@ -165,7 +169,7 @@ export default function ViewImportReceipt() {
 
                             <div className="grid grid-cols-2 gap-x-12 gap-y-4">
                                 <div className="space-y-4">
-                                    <InfoRow label="Nguồn nhập" value={data.supplierName} />
+                                    <InfoRow label="Nguồn xuất" value={data.supplierName} />
                                     <InfoRow label="Mã nguồn" value={data.supplierCode} />
                                     <InfoRow label="Số điện thoại" value={data.supplierPhone} />
                                     <InfoRow
@@ -176,10 +180,10 @@ export default function ViewImportReceipt() {
                                 </div>
 
                                 <div className="space-y-4">
-                                    <InfoRow label="Mã phiếu" value={data.code} />
-                                    <InfoRow label="Nhập tại kho" value="Kho tổng" />
-                                    <InfoRow label="Mã kho" value="KT_001" />
-                                    <InfoRow label="Lý do nhập" value={data.note} multi />
+                                    <InfoRow label="Mã lệnh" value={data.code} />
+                                    <InfoRow label="Xuất tại kho" value="Kho tổng" />
+                                    <InfoRow label="Mã kho" value="KT_5467" />
+                                    <InfoRow label="Lý do" value={data.note} multi />
                                 </div>
                             </div>
                         </div>
@@ -301,23 +305,91 @@ function InfoRow({ label, value, multi = false }: InfoRowProps) {
     );
 }
 
+// Helper function để chuyển trạng thái sang tiếng Việt
+function getStatusText(status: string): string {
+    const statusMap: Record<string, string> = {
+        'PENDING': 'Chờ xử lý',
+        'IMPORTED': 'Đã nhập',
+        'EXPORTED': 'Đã xuất',
+        'CANCELLED': 'Đã hủy',
+        'APPROVED': 'Đã duyệt',
+        'REJECTED': 'Đã từ chối',
+        'RETURNED': 'Đã hoàn trả',
+    };
+    return statusMap[status] || status;
+}
+
 function StatusSidebar({ data }: { data: SupplierImport }) {
+    const router = useRouter();
+    const [processing, setProcessing] = useState(false);
+
+    const handleConfirm = async () => {
+        if (!confirm('Xác nhận nhập kho? Tồn kho sẽ được cập nhật.')) return;
+
+        try {
+            setProcessing(true);
+            const { confirmSupplierImport } = await import('@/services/inventory.service');
+            await confirmSupplierImport(data.id);
+            alert('Đã xác nhận nhập kho thành công!');
+            // Reload lại trang để cập nhật trạng thái
+            window.location.reload();
+        } catch (err) {
+            alert(err instanceof Error ? err.message : 'Lỗi xác nhận');
+        } finally {
+            setProcessing(false);
+        }
+    };
+
+    const handleCancel = async () => {
+        if (!confirm('Hủy phiếu nhập này?')) return;
+
+        try {
+            setProcessing(true);
+            const { cancelSupplierImport } = await import('@/services/inventory.service');
+            await cancelSupplierImport(data.id);
+            alert('Đã hủy phiếu nhập!');
+            // Reload lại trang để cập nhật trạng thái
+            window.location.reload();
+        } catch (err) {
+            alert(err instanceof Error ? err.message : 'Lỗi hủy phiếu');
+        } finally {
+            setProcessing(false);
+        }
+    };
+
     return (
         <div className="w-[274px] bg-gray-100 rounded-lg p-5 shadow-lg h-fit">
             <h3 className="text-base font-bold mb-4">Tình trạng</h3>
 
-            <div className="space-y-6">
-                <div>
-                    <p className="text-sm font-medium">Tạo lúc:</p>
-                    <div className="px-3 py-2 bg-white border">
-                        {new Date(data.importsDate).toLocaleString('vi-VN')}
-                    </div>
+            <div className="space-y-4">
+                <div className="px-4 py-2 bg-white border border-gray-400 rounded">
+                    <div className="text-sm font-bold mb-1">Trạng thái</div>
+                    <div className="text-sm">{getStatusText(data.status)}</div>
                 </div>
 
-                <div>
-                    <p className="text-sm font-medium">Trạng thái:</p>
-                    <div className="px-3 py-2 bg-white border">{data.status}</div>
+                <div className="px-4 py-2 bg-white border border-gray-400 rounded">
+                    <div className="text-sm font-bold mb-1">Tổng giá trị</div>
+                    <div className="text-sm">{data.totalValue.toLocaleString('vi-VN')}</div>
                 </div>
+
+                {data.status === 'PENDING' && (
+                    <div className="space-y-3 mt-4">
+                        <button
+                            onClick={handleConfirm}
+                            disabled={processing}
+                            className="w-full px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded font-semibold disabled:opacity-60"
+                        >
+                            {processing ? 'Đang xử lý...' : 'Nhập kho'}
+                        </button>
+                        <button
+                            onClick={handleCancel}
+                            disabled={processing}
+                            className="w-full px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded font-semibold disabled:opacity-60"
+                        >
+                            Hủy phiếu
+                        </button>
+                    </div>
+                )}
             </div>
         </div>
     );

@@ -10,6 +10,7 @@ import {
     updateSupplier,
     type Supplier,
 } from '@/services/supplier.service';
+import { SUPPLIER_TYPES, SUPPLIER_TYPE_LABELS } from '@/types/supplier';
 
 export default function EditSupplierPage() {
     const router = useRouter();
@@ -142,11 +143,11 @@ export default function EditSupplierPage() {
                                     onChange={(e) => setType(e.target.value)}
                                 >
                                     <option value="">Chọn loại nguồn</option>
-                                    <option value="Nhà cung cấp">Nhà cung cấp</option>
-                                    <option value="Đại lý cấp 1">Đại lý cấp 1</option>
-                                    <option value="Đại lý cấp 2">Đại lý cấp 2</option>
-                                    <option value="NVBH">NVBH</option>
-                                    <option value="Kho tổng">Kho tổng</option>
+                                    {Object.entries(SUPPLIER_TYPE_LABELS).map(([key, label]) => (
+                                        <option key={key} value={key}>
+                                            {label}
+                                        </option>
+                                    ))}
                                 </select>
                                 <svg
                                     className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none"

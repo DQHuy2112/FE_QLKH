@@ -19,12 +19,13 @@ const statusConfig: Record<
     BackendExportStatus,
     { label: string; color: string }
 > = {
-    PENDING: { label: 'Chờ duyệt', color: 'bg-[#fcbd17]' },
+    PENDING: { label: 'Chờ xuất', color: 'bg-[#fcbd17]' },
+    EXPORTED: { label: 'Đã xuất', color: 'bg-[#1ea849]' },
+    CANCELLED: { label: 'Đã hủy', color: 'bg-[#a0a0a0]' },
     APPROVED: { label: 'Đã duyệt', color: 'bg-[#1ea849]' },
     REJECTED: { label: 'Từ chối', color: 'bg-[#ee4b3d]' },
-    EXPORTED: { label: 'Đã xuất', color: 'bg-[#3573eb]' },
+    IMPORTED: { label: 'Đã nhập', color: 'bg-[#3573eb]' },
     RETURNED: { label: 'Hoàn hàng', color: 'bg-[#b84ebb]' },
-    CANCELLED: { label: 'Đã hủy', color: 'bg-gray-400' },
 };
 
 type SortField = 'totalValue' | 'exportsDate';
@@ -51,6 +52,10 @@ export default function ExportReceiptsPage() {
     const [fromDate, setFromDate] = useState('');
     const [toDate, setToDate] = useState('');
     const [supplierFilter, setSupplierFilter] = useState<number | 'ALL'>('ALL');
+
+    // pagination state
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage] = useState(7);
 
     // map supplierId → name
     const supplierMap = useMemo(() => {
@@ -132,6 +137,7 @@ export default function ExportReceiptsPage() {
             const afterSupplierFilter = applySupplierFilter(exports);
             const afterSort = applySort(afterSupplierFilter, sortField, sortDirection);
             setData(afterSort);
+            setCurrentPage(1);
         } catch (e) {
             const msg =
                 e instanceof Error
@@ -140,6 +146,27 @@ export default function ExportReceiptsPage() {
             setError(msg);
         } finally {
             setLoading(false);
+        }
+    };
+
+    // Pagination calculations
+    const totalItems = data.length;
+    const totalPages = Math.ceil(totalItems / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const currentData = data.slice(startIndex, endIndex);
+    const displayStart = totalItems === 0 ? 0 : startIndex + 1;
+    const displayEnd = Math.min(endIndex, totalItems);
+
+    const handlePreviousPage = () => {
+        if (currentPage > 1) {
+            setCurrentPage(currentPage - 1);
+        }
+    };
+
+    const handleNextPage = () => {
+        if (currentPage < totalPages) {
+            setCurrentPage(currentPage + 1);
         }
     };
 
@@ -249,11 +276,8 @@ export default function ExportReceiptsPage() {
                                     }
                                 >
                                     <option value="ALL">Tất cả</option>
-                                    <option value="PENDING">Chờ duyệt</option>
-                                    <option value="APPROVED">Đã duyệt</option>
-                                    <option value="REJECTED">Từ chối</option>
+                                    <option value="PENDING">Chờ xuất</option>
                                     <option value="EXPORTED">Đã xuất</option>
-                                    <option value="RETURNED">Hoàn hàng</option>
                                     <option value="CANCELLED">Đã hủy</option>
                                 </select>
                                 <svg
@@ -438,13 +462,13 @@ export default function ExportReceiptsPage() {
                                     </tr>
                                 )}
 
-                                {data.map((record, index) => (
+                                {currentData.map((record, index) => (
                                     <tr
                                         key={record.id}
                                         className="border-b border-gray-200 hover:bg-gray-50 transition-colors h-[48px]"
                                     >
                                         <td className="px-4 text-center text-sm">
-                                            {index + 1}
+                                            {startIndex + index + 1}
                                         </td>
                                         <td className="px-4 text-center text-sm">{record.code}</td>
                                         <td className="px-4 text-center text-sm">
@@ -498,13 +522,23 @@ export default function ExportReceiptsPage() {
                                                     </svg>
                                                 </button>
                                                 <button
-                                                    onClick={() =>
-                                                        router.push(
-                                                            `/dashboard/products/export/edit-export-receipt/${record.id}`,
-                                                        )
+                                                    onClick={() => {
+                                                        if (record.status !== 'EXPORTED' && record.status !== 'CANCELLED') {
+                                                            router.push(
+                                                                `/dashboard/products/export/edit-export-receipt/${record.id}`,
+                                                            );
+                                                        }
+                                                    }}
+                                                    disabled={record.status === 'EXPORTED' || record.status === 'CANCELLED'}
+                                                    className={`transition-transform ${record.status === 'EXPORTED' || record.status === 'CANCELLED'
+                                                        ? 'opacity-40 cursor-not-allowed'
+                                                        : 'hover:scale-110 cursor-pointer'
+                                                        }`}
+                                                    title={
+                                                        record.status === 'EXPORTED' || record.status === 'CANCELLED'
+                                                            ? 'Không thể chỉnh sửa'
+                                                            : 'Chỉnh sửa'
                                                     }
-                                                    className="hover:scale-110 transition-transform"
-                                                    title="Chỉnh sửa"
                                                 >
                                                     <svg
                                                         width="24"
@@ -514,13 +548,21 @@ export default function ExportReceiptsPage() {
                                                     >
                                                         <path
                                                             d="M11 4H4C3.46957 4 2.96086 4.21071 2.58579 4.58579C2.21071 4.96086 2 5.46957 2 6V20C2 20.5304 2.21071 21.0391 2.58579 21.4142C2.96086 21.7893 3.46957 22 4 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V13"
-                                                            stroke="#0046ff"
+                                                            stroke={
+                                                                record.status === 'EXPORTED' || record.status === 'CANCELLED'
+                                                                    ? '#9ca3af'
+                                                                    : '#0046ff'
+                                                            }
                                                             strokeWidth="2"
                                                             strokeLinecap="round"
                                                         />
                                                         <path
                                                             d="M18.5 2.5C18.8978 2.10217 19.4374 1.87868 20 1.87868C20.5626 1.87868 21.1022 2.10217 21.5 2.5C21.8978 2.89782 22.1213 3.43739 22.1213 4C22.1213 4.56261 21.8978 5.10217 21.5 5.5L12 15L8 16L9 12L18.5 2.5Z"
-                                                            stroke="#0046ff"
+                                                            stroke={
+                                                                record.status === 'EXPORTED' || record.status === 'CANCELLED'
+                                                                    ? '#9ca3af'
+                                                                    : '#0046ff'
+                                                            }
                                                             strokeWidth="2"
                                                             strokeLinecap="round"
                                                             strokeLinejoin="round"
@@ -533,6 +575,32 @@ export default function ExportReceiptsPage() {
                                 ))}
                             </tbody>
                         </table>
+                    </div>
+
+                    {/* Pagination */}
+                    <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200">
+                        <div className="text-sm text-gray-600">
+                            Hiển thị {displayStart} - {displayEnd}/{totalItems} bản ghi
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={handlePreviousPage}
+                                disabled={currentPage === 1}
+                                className="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                Trước
+                            </button>
+                            <span className="px-4 py-2 text-sm">
+                                Trang {currentPage}/{totalPages || 1}
+                            </span>
+                            <button
+                                onClick={handleNextPage}
+                                disabled={currentPage >= totalPages}
+                                className="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                Sau
+                            </button>
+                        </div>
                     </div>
                 </div>
             </main>

@@ -44,23 +44,51 @@ export default function ViewExportReceipt() {
             try {
                 setLoading(true);
 
-                // Lấy NCC + phiếu xuất song song
-                const [suppliers, exportData] = await Promise.all([
-                    getSuppliers(),
-                    getSupplierExportById(id),
-                ]);
+                // Lấy phiếu xuất
+                const exportData = await getSupplierExportById(id);
 
-                // ---- map lại thông tin NCC ----
-                const sp = suppliers.find(
-                    (s: Supplier) => s.id === exportData.supplierId,
-                );
+                // ---- Fetch thông tin NCC nếu thiếu ----
+                let supplier: Supplier | null = null;
+                if (exportData.supplierId && !exportData.supplierName) {
+                    try {
+                        const suppliers = await getSuppliers();
+                        supplier = suppliers.find((s: Supplier) => s.id === exportData.supplierId) ?? null;
+                    } catch (err) {
+                        console.error('Failed to fetch suppliers:', err);
+                    }
+                }
+
+                // ⭐ Xử lý attachmentImages: nếu backend chưa trả về, parse từ note
+                let cleanNote = exportData.note || '';
+                let images = exportData.attachmentImages || [];
+
+                // Nếu chưa có attachmentImages, thử parse từ note
+                if (images.length === 0 && cleanNote) {
+                    // Pattern: "text | Hợp đồng: url1, url2 | Sở cứ: url3, url4"
+                    const parts = cleanNote.split(' | ');
+                    const textParts: string[] = [];
+
+                    parts.forEach(part => {
+                        if (part.includes('Hợp đồng:') || part.includes('Sở cứ:')) {
+                            // Extract URLs
+                            const urls = part.split(':')[1]?.split(',').map(u => u.trim()) || [];
+                            images.push(...urls);
+                        } else {
+                            textParts.push(part);
+                        }
+                    });
+
+                    cleanNote = textParts.join(' | ');
+                }
 
                 const mappedExport: SupplierExport = {
                     ...exportData,
-                    supplierName: sp?.name ?? exportData.supplierName ?? null,
-                    supplierCode: sp?.code ?? exportData.supplierCode ?? null,
-                    supplierPhone: sp?.phone ?? exportData.supplierPhone ?? null,
-                    supplierAddress: sp?.address ?? exportData.supplierAddress ?? null,
+                    supplierName: supplier?.name ?? exportData.supplierName ?? null,
+                    supplierCode: supplier?.code ?? exportData.supplierCode ?? null,
+                    supplierPhone: supplier?.phone ?? exportData.supplierPhone ?? null,
+                    supplierAddress: supplier?.address ?? exportData.supplierAddress ?? null,
+                    note: cleanNote,
+                    attachmentImages: images,
                 };
 
                 setData(mappedExport);
@@ -176,10 +204,10 @@ export default function ViewExportReceipt() {
                                 </div>
 
                                 <div className="space-y-4">
-                                    <InfoRow label="Mã phiếu" value={data.code} />
+                                    <InfoRow label="Mã lệnh" value={data.code} />
                                     <InfoRow label="Xuất tại kho" value="Kho tổng" />
-                                    <InfoRow label="Mã kho" value="KT_001" />
-                                    <InfoRow label="Lý do xuất" value={data.note || data.description} multi />
+                                    <InfoRow label="Mã kho" value="KT_5467" />
+                                    <InfoRow label="Lý do" value={data.note} multi />
                                 </div>
                             </div>
                         </div>
@@ -301,23 +329,91 @@ function InfoRow({ label, value, multi = false }: InfoRowProps) {
     );
 }
 
+// Helper function để chuyển trạng thái sang tiếng Việt
+function getStatusText(status: string): string {
+    const statusMap: Record<string, string> = {
+        'PENDING': 'Chờ xử lý',
+        'IMPORTED': 'Đã nhập',
+        'EXPORTED': 'Đã xuất',
+        'CANCELLED': 'Đã hủy',
+        'APPROVED': 'Đã duyệt',
+        'REJECTED': 'Đã từ chối',
+        'RETURNED': 'Đã hoàn trả',
+    };
+    return statusMap[status] || status;
+}
+
 function StatusSidebar({ data }: { data: SupplierExport }) {
+    const router = useRouter();
+    const [processing, setProcessing] = useState(false);
+
+    const handleConfirm = async () => {
+        if (!confirm('Xác nhận xuất kho? Tồn kho sẽ được cập nhật.')) return;
+
+        try {
+            setProcessing(true);
+            const { confirmSupplierExport } = await import('@/services/inventory.service');
+            await confirmSupplierExport(data.id);
+            alert('Đã xác nhận xuất kho thành công!');
+            // Reload lại trang để cập nhật trạng thái
+            window.location.reload();
+        } catch (err) {
+            alert(err instanceof Error ? err.message : 'Lỗi xác nhận');
+        } finally {
+            setProcessing(false);
+        }
+    };
+
+    const handleCancel = async () => {
+        if (!confirm('Hủy phiếu xuất này?')) return;
+
+        try {
+            setProcessing(true);
+            const { cancelSupplierExport } = await import('@/services/inventory.service');
+            await cancelSupplierExport(data.id);
+            alert('Đã hủy phiếu xuất!');
+            // Reload lại trang để cập nhật trạng thái
+            window.location.reload();
+        } catch (err) {
+            alert(err instanceof Error ? err.message : 'Lỗi hủy phiếu');
+        } finally {
+            setProcessing(false);
+        }
+    };
+
     return (
         <div className="w-[274px] bg-gray-100 rounded-lg p-5 shadow-lg h-fit">
             <h3 className="text-base font-bold mb-4">Tình trạng</h3>
 
-            <div className="space-y-6">
-                <div>
-                    <p className="text-sm font-medium">Tạo lúc:</p>
-                    <div className="px-3 py-2 bg-white border">
-                        {new Date(data.exportsDate).toLocaleString('vi-VN')}
-                    </div>
+            <div className="space-y-4">
+                <div className="px-4 py-2 bg-white border border-gray-400 rounded">
+                    <div className="text-sm font-bold mb-1">Trạng thái</div>
+                    <div className="text-sm">{getStatusText(data.status)}</div>
                 </div>
 
-                <div>
-                    <p className="text-sm font-medium">Trạng thái:</p>
-                    <div className="px-3 py-2 bg-white border">{data.status}</div>
+                <div className="px-4 py-2 bg-white border border-gray-400 rounded">
+                    <div className="text-sm font-bold mb-1">Tổng giá trị</div>
+                    <div className="text-sm">{data.totalValue.toLocaleString('vi-VN')}</div>
                 </div>
+
+                {data.status === 'PENDING' && (
+                    <div className="space-y-3 mt-4">
+                        <button
+                            onClick={handleConfirm}
+                            disabled={processing}
+                            className="w-full px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded font-semibold disabled:opacity-60"
+                        >
+                            {processing ? 'Đang xử lý...' : 'Xuất kho'}
+                        </button>
+                        <button
+                            onClick={handleCancel}
+                            disabled={processing}
+                            className="w-full px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded font-semibold disabled:opacity-60"
+                        >
+                            Hủy phiếu
+                        </button>
+                    </div>
+                )}
             </div>
         </div>
     );

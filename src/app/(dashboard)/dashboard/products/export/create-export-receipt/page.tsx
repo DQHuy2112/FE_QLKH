@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 'use client';
 
 import {
@@ -16,6 +17,8 @@ import {
     type Supplier,
 } from '@/services/supplier.service';
 
+
+
 import {
     createSupplierExport,
     type SupplierExportCreateRequest,
@@ -27,7 +30,6 @@ import {
 } from '@/services/product.service';
 import type { Product } from '@/types/product';
 
-// ========= CẤU HÌNH ẢNH ============= //
 const API_BASE_URL = 'http://localhost:8080';
 
 function buildImageUrl(path: string | null | undefined): string {
@@ -37,19 +39,17 @@ function buildImageUrl(path: string | null | undefined): string {
     return `${API_BASE_URL}${clean}`;
 }
 
-// ========= KIỂU DỮ LIỆU ============= //
 interface ProductItem {
-    id: number;             // STT / row (FE)
-    productId: number;      // map với shop_products.products_id
-    importDetailsId: number; // map với shop_import_details.import_details_id (tạm 0)
+    id: number;
+    productId: number;
     name: string;
     code: string;
     unit: string;
-    price: string;          // hiển thị, dạng "30.000.000"
-    quantity: string;       // hiển thị
-    discount: string;       // "5" = 5%
-    total: string;          // hiển thị
-    availableQuantity: number; // tồn kho hiện có (từ Product.quantity)
+    price: string;
+    quantity: string;
+    discount: string;
+    total: string;
+    availableQuantity: number;
 }
 
 const formatCurrency = (value: number) =>
@@ -60,20 +60,33 @@ const parseNumber = (value: string): number => {
     return cleaned ? Number(cleaned) : 0;
 };
 
+function InfoRow({
+    label,
+    children,
+    multi = false,
+}: {
+    label: string;
+    children: React.ReactNode;
+    multi?: boolean;
+}) {
+    return (
+        <div className="flex items-start gap-3">
+            <label className="w-28 text-sm pt-1">{label}</label>
+            <div className="flex-1">{children}</div>
+        </div>
+    );
+}
+
 export default function TaoPhieuXuatKho() {
     const router = useRouter();
 
-    // ====== NCC / nguồn nhận ====== //
     const [suppliers, setSuppliers] = useState<Supplier[]>([]);
     const [selectedSupplierId, setSelectedSupplierId] = useState<number | ''>('');
 
-    // ====== Thông tin chung ====== //
     const [phone, setPhone] = useState('');
     const [address, setAddress] = useState('');
-    const [reason, setReason] = useState(''); // lý do xuất
-    const [note, setNote] = useState('');     // ghi chú / mô tả hợp đồng / khác
+    const [reason, setReason] = useState('');
 
-    // ====== Hàng hóa ====== //
     const [products, setProducts] = useState<ProductItem[]>([]);
 
     const [loadingSuppliers, setLoadingSuppliers] = useState(false);
@@ -81,28 +94,22 @@ export default function TaoPhieuXuatKho() {
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
 
-    // ====== Popup chọn hàng hóa từ danh sách sản phẩm thật ====== //
     const [showProductModal, setShowProductModal] = useState(false);
     const [productList, setProductList] = useState<Product[]>([]);
     const [loadingProducts, setLoadingProducts] = useState(false);
     const [productError, setProductError] = useState<string | null>(null);
     const [selectedProductIds, setSelectedProductIds] = useState<number[]>([]);
 
-    // ====== ẢNH HỢP ĐỒNG & SỞ CỨ (NHIỀU ẢNH) ====== //
-    const [contractImageUrls, setContractImageUrls] = useState<string[]>([]);
-    const [supportImageUrls, setSupportImageUrls] = useState<string[]>([]);
-    const [uploadingContractImages, setUploadingContractImages] = useState(false);
-    const [uploadingSupportImages, setUploadingSupportImages] = useState(false);
+    // ⭐ Gộp tất cả ảnh vào 1 state
+    const [attachmentImages, setAttachmentImages] = useState<string[]>([]);
+    const [uploadingImages, setUploadingImages] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-    const contractFileInputRef = useRef<HTMLInputElement | null>(null);
-    const supportFileInputRef = useRef<HTMLInputElement | null>(null);
-
-    // ====== Load NCC ====== //
     useEffect(() => {
         const fetchSuppliers = async () => {
             try {
                 setLoadingSuppliers(true);
-                const list = await getSuppliers();
+                const list = await getSuppliers('NCC');
                 setSuppliers(list);
             } catch (e) {
                 console.error(e);
@@ -119,7 +126,6 @@ export default function TaoPhieuXuatKho() {
         fetchSuppliers();
     }, []);
 
-    // auto fill SĐT / địa chỉ theo NCC //
     useEffect(() => {
         if (!selectedSupplierId) return;
         const s = suppliers.find((x) => x.id === selectedSupplierId);
@@ -128,11 +134,10 @@ export default function TaoPhieuXuatKho() {
         setAddress(s.address ?? '');
     }, [selectedSupplierId, suppliers]);
 
-    // ====== TÍNH TOÁN TIỀN ====== //
     const recalcRowTotal = (item: ProductItem): ProductItem => {
         const price = parseNumber(item.price);
         const qty = parseNumber(item.quantity);
-        const discountPercent = parseNumber(item.discount); // 5 => 5%
+        const discountPercent = parseNumber(item.discount);
 
         let total = price * qty;
         if (discountPercent > 0) {
@@ -171,12 +176,10 @@ export default function TaoPhieuXuatKho() {
         setProducts((prev) => prev.filter((p) => p.id !== id));
     };
 
-    // ====== POPUP THÊM HÀNG TỪ HỆ THỐNG ====== //
     const openProductModal = async () => {
         setShowProductModal(true);
         setProductError(null);
 
-        // Khi mở popup, tự tick các sản phẩm đã có trong phiếu
         const idsFromCurrent = products.map((p) => p.productId);
         setSelectedProductIds(idsFromCurrent);
 
@@ -200,7 +203,6 @@ export default function TaoPhieuXuatKho() {
 
     const closeProductModal = () => {
         setShowProductModal(false);
-        // KHÔNG xoá selectedProductIds để lần sau mở lại vẫn còn tick
     };
 
     const toggleSelectProduct = (productId: number) => {
@@ -224,7 +226,6 @@ export default function TaoPhieuXuatKho() {
             const newRows: ProductItem[] = [];
 
             selectedProductIds.forEach((pid) => {
-                // đã có trong bảng chính thì không thêm nữa
                 if (existingProductIds.has(pid)) return;
 
                 const prod = productList.find((p) => p.id === pid);
@@ -235,10 +236,9 @@ export default function TaoPhieuXuatKho() {
                 const row: ProductItem = {
                     id: runningRowId,
                     productId: prod.id,
-                    importDetailsId: 0, // TODO: sau này map với import_detail thực tế
                     name: prod.name,
                     code: prod.code,
-                    unit: 'Cái', // nếu có unit trong Product thì map sang
+                    unit: 'Cái',
                     price: formatCurrency(prod.unitPrice ?? 0),
                     quantity: '',
                     discount: '',
@@ -255,19 +255,13 @@ export default function TaoPhieuXuatKho() {
         closeProductModal();
     };
 
-    // ====== UPLOAD ẢNH HỢP ĐỒNG (NHIỀU ẢNH) ====== //
-    const handleClickUploadContractImages = () => {
-        contractFileInputRef.current?.click();
-    };
-
-    const handleContractFilesChange = async (
-        e: ChangeEvent<HTMLInputElement>,
-    ) => {
+    // ⭐ Upload ảnh (gộp chung)
+    const handleUploadImages = async (e: ChangeEvent<HTMLInputElement>) => {
         const files = e.target.files;
         if (!files || files.length === 0) return;
 
         try {
-            setUploadingContractImages(true);
+            setUploadingImages(true);
             const uploadedUrls: string[] = [];
 
             for (const file of Array.from(files)) {
@@ -275,65 +269,25 @@ export default function TaoPhieuXuatKho() {
                 uploadedUrls.push(url);
             }
 
-            setContractImageUrls((prev) => [...prev, ...uploadedUrls]);
+            setAttachmentImages((prev) => [...prev, ...uploadedUrls]);
             setError(null);
         } catch (err) {
             console.error(err);
             setError(
                 err instanceof Error
                     ? err.message
-                    : 'Tải ảnh hợp đồng thất bại',
+                    : 'Tải ảnh thất bại',
             );
         } finally {
-            setUploadingContractImages(false);
+            setUploadingImages(false);
             e.target.value = '';
         }
     };
 
-    const removeContractImage = (url: string) => {
-        setContractImageUrls((prev) => prev.filter((u) => u !== url));
+    const removeImage = (url: string) => {
+        setAttachmentImages((prev) => prev.filter((u) => u !== url));
     };
 
-    // ====== UPLOAD ẢNH SỞ CỨ (NHIỀU ẢNH) ====== //
-    const handleClickUploadSupportImages = () => {
-        supportFileInputRef.current?.click();
-    };
-
-    const handleSupportFilesChange = async (
-        e: ChangeEvent<HTMLInputElement>,
-    ) => {
-        const files = e.target.files;
-        if (!files || files.length === 0) return;
-
-        try {
-            setUploadingSupportImages(true);
-            const uploadedUrls: string[] = [];
-
-            for (const file of Array.from(files)) {
-                const url = await uploadProductImage(file);
-                uploadedUrls.push(url);
-            }
-
-            setSupportImageUrls((prev) => [...prev, ...uploadedUrls]);
-            setError(null);
-        } catch (err) {
-            console.error(err);
-            setError(
-                err instanceof Error
-                    ? err.message
-                    : 'Tải ảnh sở cứ thất bại',
-            );
-        } finally {
-            setUploadingSupportImages(false);
-            e.target.value = '';
-        }
-    };
-
-    const removeSupportImage = (url: string) => {
-        setSupportImageUrls((prev) => prev.filter((u) => u !== url));
-    };
-
-    // ====== Submit tạo phiếu ====== //
     const handleSave = async () => {
         try {
             setError(null);
@@ -349,14 +303,13 @@ export default function TaoPhieuXuatKho() {
                 return;
             }
 
-            // Kiểm tra số lượng không vượt tồn kho
             const overItems: string[] = [];
             for (const p of products) {
                 const qty = parseNumber(p.quantity);
                 if (!qty) continue;
                 if (p.availableQuantity != null && qty > p.availableQuantity) {
                     overItems.push(
-                        `${p.name} (tồn ${p.availableQuantity}, nhập ${qty})`,
+                        `${p.name} (tồn ${p.availableQuantity}, xuất ${qty})`,
                     );
                 }
             }
@@ -370,7 +323,6 @@ export default function TaoPhieuXuatKho() {
             const items = products
                 .filter((p) => parseNumber(p.quantity) > 0 && parseNumber(p.price) > 0)
                 .map((p) => ({
-                    importDetailsId: p.importDetailsId, // hiện đang là 0 / fake, sau map thật
                     productId: p.productId,
                     quantity: parseNumber(p.quantity),
                     unitPrice: parseNumber(p.price),
@@ -381,34 +333,12 @@ export default function TaoPhieuXuatKho() {
                 return;
             }
 
-            // Gộp note + URL ảnh lại, nhưng GIỚI HẠN độ dài để không lỗi cột note
-            const noteParts: string[] = [];
-            if (note) noteParts.push(note);
-
-            if (contractImageUrls.length > 0) {
-                noteParts.push(
-                    `Hợp đồng: ${contractImageUrls.join(', ')}`,
-                );
-            }
-            if (supportImageUrls.length > 0) {
-                noteParts.push(
-                    `Sở cứ: ${supportImageUrls.join(', ')}`,
-                );
-            }
-
-            let noteToSend = noteParts.join(' | ');
-
-            // Tránh lỗi "Data too long for column 'note'"
-            const MAX_NOTE_LEN = 240; // tạm cho là 240, dư 1 chút so với VARCHAR(255)
-            if (noteToSend.length > MAX_NOTE_LEN) {
-                noteToSend = noteToSend.slice(0, MAX_NOTE_LEN - 3) + '...';
-            }
-
             const payload: SupplierExportCreateRequest = {
-                storeId: 1, // TODO: nếu bạn có store hiện tại thì thay ở đây
+                storeId: 1,
                 supplierId: selectedSupplierId as number,
-                note: noteToSend || undefined,
-                description: reason || undefined,
+                note: reason || undefined,
+                description: undefined,
+                attachmentImages: attachmentImages.length > 0 ? attachmentImages : undefined,
                 items,
             };
 
@@ -438,14 +368,6 @@ export default function TaoPhieuXuatKho() {
             <Sidebar />
 
             <main className="ml-[377px] mt-[113px] p-6 pr-12">
-                {/* Breadcrumb */}
-                <div className="mb-4">
-                    <p className="text-base font-bold text-gray-800">
-                        Xuất - nhập với NCC &gt; Tạo mới phiếu xuất kho
-                    </p>
-                </div>
-
-                {/* Thông báo */}
                 {error && (
                     <div className="mb-4 text-sm text-red-600 whitespace-pre-line bg-red-50 border border-red-200 rounded px-4 py-2">
                         {error}
@@ -457,80 +379,53 @@ export default function TaoPhieuXuatKho() {
                     </div>
                 )}
 
-                {/* Action Buttons (thêm hàng) */}
                 <div className="flex gap-4 mb-6">
                     <button
                         type="button"
                         onClick={openProductModal}
                         className="px-6 py-2.5 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-lg font-bold text-sm shadow-lg transition-all"
                     >
-                        + Thêm hàng
-                        <br />
-                        từ hệ thống
-                    </button>
-                    <button className="px-6 py-2.5 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-lg font-bold text-sm shadow-lg transition-all">
-                        + Thêm hàng
-                        <br />
-                        từ file ngoài
+                        + Thêm hàng từ hệ thống
                     </button>
                 </div>
 
-                {/* Main Form */}
-                <div className="bg-white rounded-lg shadow-2xl p-8">
+                <div className="bg-white rounded-lg shadow-2xl p-8 border border-black">
                     <h2 className="text-xl font-bold text-center mb-6">PHIẾU XUẤT KHO</h2>
 
-                    {/* Thông tin chung */}
-                    <div className="border-4 border-blue-600 bg-gray-100 p-6 mb-6 rounded">
+                    {/* THÔNG TIN CHUNG */}
+                    <div className="border border-black bg-gray-100 p-6 mb-6 rounded">
                         <h3 className="text-base font-bold mb-4">Thông tin chung</h3>
 
                         <div className="grid grid-cols-2 gap-x-12 gap-y-4">
-                            {/* Left Column */}
                             <div className="space-y-4">
-                                <div className="flex items-center gap-3">
-                                    <label className="w-28 text-sm">Nguồn nhận</label>
-                                    <div className="flex-1 relative">
-                                        <select
-                                            className="w-full px-3 py-1.5 border border-blue-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none bg-white"
-                                            disabled={loadingSuppliers}
-                                            value={
-                                                selectedSupplierId === ''
-                                                    ? ''
-                                                    : String(selectedSupplierId)
-                                            }
-                                            onChange={(e) =>
-                                                setSelectedSupplierId(
-                                                    e.target.value ? Number(e.target.value) : '',
-                                                )
-                                            }
-                                        >
-                                            <option value="">Chọn nguồn nhận</option>
-                                            {suppliers.map((s) => (
-                                                <option key={s.id} value={s.id}>
-                                                    {s.name}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        <svg
-                                            className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            viewBox="0 0 24 24"
-                                        >
-                                            <path
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                strokeWidth={2}
-                                                d="M19 9l-7 7-7-7"
-                                            />
-                                        </svg>
-                                    </div>
-                                </div>
+                                <InfoRow label="Nguồn nhận">
+                                    <select
+                                        className="w-full px-3 py-1.5 border border-black rounded bg-white"
+                                        disabled={loadingSuppliers}
+                                        value={
+                                            selectedSupplierId === ''
+                                                ? ''
+                                                : String(selectedSupplierId)
+                                        }
+                                        onChange={(e) =>
+                                            setSelectedSupplierId(
+                                                e.target.value ? Number(e.target.value) : '',
+                                            )
+                                        }
+                                    >
+                                        <option value="">Chọn nhà cung cấp</option>
+                                        {suppliers.map((s) => (
+                                            <option key={s.id} value={s.id}>
+                                                {s.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </InfoRow>
 
-                                <div className="flex items-center gap-3">
-                                    <label className="w-28 text-sm">Mã nguồn</label>
+                                <InfoRow label="Mã nguồn">
                                     <input
                                         type="text"
-                                        className="flex-1 px-3 py-1.5 border border-blue-600 rounded bg-gray-100 focus:outline-none"
+                                        className="w-full px-3 py-1.5 border border-black rounded bg-gray-100"
                                         value={
                                             selectedSupplierId
                                                 ? suppliers.find((s) => s.id === selectedSupplierId)
@@ -539,97 +434,98 @@ export default function TaoPhieuXuatKho() {
                                         }
                                         readOnly
                                     />
-                                </div>
+                                </InfoRow>
 
-                                <div className="flex items-center gap-3">
-                                    <label className="w-28 text-sm">Số điện thoại</label>
+                                <InfoRow label="Số điện thoại">
                                     <input
                                         type="text"
-                                        className="flex-1 px-3 py-1.5 border border-blue-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        className="w-full px-3 py-1.5 border border-black rounded"
                                         value={phone}
                                         onChange={(e) => setPhone(e.target.value)}
                                     />
-                                </div>
+                                </InfoRow>
 
-                                <div className="flex items-start gap-3">
-                                    <label className="w-28 text-sm pt-2">Địa chỉ</label>
+                                <InfoRow label="Địa chỉ" multi>
                                     <textarea
-                                        className="flex-1 px-3 py-2 border border-blue-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 h-14 resize-none"
+                                        className="w-full px-3 py-1.5 border border-black rounded h-14 resize-none"
                                         value={address}
                                         onChange={(e) => setAddress(e.target.value)}
                                     />
-                                </div>
+                                </InfoRow>
                             </div>
 
-                            {/* Right Column */}
                             <div className="space-y-4">
-                                <div className="flex items-center gap-3">
-                                    <label className="w-28 text-sm">Mã phiếu</label>
-                                    <div className="flex-1 relative">
-                                        <select className="w-full px-3 py-1.5 border border-gray-400 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none bg-gray-200">
-                                            <option>Tự động tạo</option>
-                                        </select>
-                                        <svg
-                                            className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            viewBox="0 0 24 24"
-                                        >
-                                            <path
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                strokeWidth={2}
-                                                d="M19 9l-7 7-7-7"
-                                            />
-                                        </svg>
-                                    </div>
-                                </div>
+                                <InfoRow label="Mã phiếu">
+                                    <input
+                                        type="text"
+                                        value="Tự động tạo"
+                                        readOnly
+                                        className="w-full px-3 py-1.5 border border-black rounded bg-gray-100"
+                                    />
+                                </InfoRow>
 
-                                <div className="flex items-start gap-3">
-                                    <label className="w-28 text-sm pt-2">Lý do xuất</label>
+                                <InfoRow label="Xuất tại kho">
+                                    <input
+                                        type="text"
+                                        value="Kho tổng"
+                                        readOnly
+                                        className="w-full px-3 py-1.5 border border-black rounded bg-gray-100"
+                                    />
+                                </InfoRow>
+
+                                <InfoRow label="Mã kho">
+                                    <input
+                                        type="text"
+                                        value="KT_001"
+                                        readOnly
+                                        className="w-full px-3 py-1.5 border border-black rounded bg-gray-100"
+                                    />
+                                </InfoRow>
+
+                                <InfoRow label="Lý do xuất" multi>
                                     <textarea
-                                        className="flex-1 px-3 py-2 border border-blue-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 h-14 resize-none"
+                                        className="w-full px-3 py-1.5 border border-black rounded h-14 resize-none"
                                         value={reason}
                                         onChange={(e) => setReason(e.target.value)}
                                     />
-                                </div>
+                                </InfoRow>
                             </div>
                         </div>
                     </div>
 
-                    {/* Product Table */}
+                    {/* BẢNG SẢN PHẨM */}
                     <div className="border-4 border-gray-400 mb-6 overflow-hidden">
-                        <table className="w-full">
+                        <table className="w-full text-sm">
                             <thead>
                                 <tr className="bg-[#0046ff] text-white h-12">
-                                    <th className="px-2 text-center font-bold text-sm w-12">
+                                    <th className="px-2 text-center font-bold w-12">
                                         STT
                                     </th>
-                                    <th className="px-2 text-center font-bold text-sm w-40">
+                                    <th className="px-2 text-center font-bold w-40">
                                         Tên hàng hóa
                                     </th>
-                                    <th className="px-2 text-center font-bold text-sm w-24">
+                                    <th className="px-2 text-center font-bold w-24">
                                         Mã hàng
                                     </th>
-                                    <th className="px-2 text-center font-bold text-sm w-20">
+                                    <th className="px-2 text-center font-bold w-20">
                                         Đơn vị tính
                                     </th>
-                                    <th className="px-2 text-center font-bold text-sm w-24">
+                                    <th className="px-2 text-center font-bold w-24">
                                         Tồn kho
                                     </th>
-                                    <th className="px-2 text-center font-bold text-sm w-28">
+                                    <th className="px-2 text-center font-bold w-28">
                                         Đơn giá
                                     </th>
-                                    <th className="px-2 text-center font-bold text-sm w-20">
+                                    <th className="px-2 text-center font-bold w-20">
                                         Số lượng
                                     </th>
-                                    <th className="px-2 text-center font-bold text-sm w-24">
+                                    <th className="px-2 text-center font-bold w-24">
                                         Chiết khấu (%)
                                     </th>
-                                    <th className="px-2 text-center font-bold text-sm w-28">
+                                    <th className="px-2 text-center font-bold w-28">
                                         Thành tiền
                                     </th>
-                                    <th className="px-2 text-center font-bold text-sm w-16">
+                                    <th className="px-2 text-center font-bold w-16">
                                         Xóa
                                     </th>
                                 </tr>
@@ -701,7 +597,7 @@ export default function TaoPhieuXuatKho() {
                                             <button
                                                 type="button"
                                                 onClick={() => deleteProduct(product.id)}
-                                                className="hover:scale-110 transition-transform"
+                                                className="text-red-600 hover:text-red-800"
                                             >
                                                 <svg
                                                     width="22"
@@ -737,157 +633,59 @@ export default function TaoPhieuXuatKho() {
                         </table>
                     </div>
 
-                    {/* Hợp đồng */}
-                    <div className="border-4 border-gray-400 bg-gray-100 p-6 mb-6 rounded">
-                        <div className="flex items-center gap-4 mb-4">
-                            <svg width="25" height="25" viewBox="0 0 25 25" fill="none">
-                                <path
-                                    d="M7 3H17C18.1046 3 19 3.89543 19 5V21L12 17L5 21V5C5 3.89543 5.89543 3 7 3Z"
-                                    stroke="#000"
-                                    strokeWidth="2"
-                                />
-                            </svg>
-                            <h3 className="text-sm font-bold">Hợp đồng</h3>
+                    {/* HỢP ĐỒNG / ẢNH ĐÍNH KÈM */}
+                    <div className="border border-black bg-gray-100 p-6 rounded mb-6">
+                        <h3 className="text-base font-bold mb-4">
+                            Hợp đồng / Ảnh đính kèm
+                        </h3>
+
+                        <div className="mb-3">
+                            <button
+                                type="button"
+                                onClick={() => fileInputRef.current?.click()}
+                                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-60"
+                                disabled={uploadingImages}
+                            >
+                                {uploadingImages ? 'Đang tải...' : 'Chọn ảnh'}
+                            </button>
+                            <input
+                                type="file"
+                                accept="image/*"
+                                multiple
+                                ref={fileInputRef}
+                                className="hidden"
+                                onChange={handleUploadImages}
+                            />
                         </div>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm mb-2">Nội dung</label>
-                                <input
-                                    type="text"
-                                    className="w-full px-3 py-1.5 border border-blue-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    value={note}
-                                    onChange={(e) => setNote(e.target.value)}
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm mb-2">
-                                    Hình ảnh (tải nhiều ảnh)
-                                </label>
-                                <div className="flex gap-2 items-center">
+
+                        <div className="flex gap-4 flex-wrap">
+                            {attachmentImages.length === 0 && (
+                                <p className="text-gray-600">Chưa có ảnh</p>
+                            )}
+
+                            {attachmentImages.map((url, idx) => (
+                                <div
+                                    key={idx}
+                                    className="w-[180px] h-[240px] bg-white border rounded shadow flex items-center justify-center relative"
+                                >
+                                    <img
+                                        src={buildImageUrl(url)}
+                                        alt={`Ảnh ${idx + 1}`}
+                                        className="w-full h-full object-contain"
+                                    />
                                     <button
                                         type="button"
-                                        onClick={handleClickUploadContractImages}
-                                        className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded shadow-lg transition-colors disabled:opacity-60"
-                                        disabled={uploadingContractImages}
+                                        onClick={() => removeImage(url)}
+                                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 text-sm flex items-center justify-center hover:bg-red-600"
                                     >
-                                        {uploadingContractImages ? 'Đang tải...' : 'Chọn ảnh'}
+                                        ✕
                                     </button>
-
-                                    <input
-                                        type="file"
-                                        accept="image/*"
-                                        multiple
-                                        ref={contractFileInputRef}
-                                        className="hidden"
-                                        onChange={handleContractFilesChange}
-                                    />
                                 </div>
-
-                                <div className="mt-2 flex flex-wrap gap-2">
-                                    {contractImageUrls.map((url) => (
-                                        <div
-                                            key={url}
-                                            className="w-20 h-20 border rounded flex items-center justify-center relative overflow-hidden"
-                                        >
-                                            <img
-                                                src={buildImageUrl(url)}
-                                                alt="Hợp đồng"
-                                                className="w-full h-full object-cover"
-                                            />
-                                            <button
-                                                type="button"
-                                                onClick={() => removeContractImage(url)}
-                                                className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-5 h-5 text-[10px] flex items-center justify-center"
-                                            >
-                                                ✕
-                                            </button>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
+                            ))}
                         </div>
                     </div>
 
-                    {/* Sở cứ */}
-                    <div className="border-4 border-gray-400 bg-gray-100 p-6 mb-6 rounded">
-                        <div className="flex items-center gap-4 mb-4">
-                            <svg width="25" height="25" viewBox="0 0 25 25" fill="none">
-                                <rect
-                                    x="5"
-                                    y="3"
-                                    width="14"
-                                    height="18"
-                                    rx="1"
-                                    stroke="#000"
-                                    strokeWidth="2"
-                                />
-                                <path
-                                    d="M9 7H15M9 11H15M9 15H13"
-                                    stroke="#000"
-                                    strokeWidth="2"
-                                    strokeLinecap="round"
-                                />
-                            </svg>
-                            <h3 className="text-sm font-bold">Sở cứ</h3>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm mb-2">Nội dung</label>
-                                <input
-                                    type="text"
-                                    className="w-full px-3 py-1.5 border border-blue-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm mb-2">
-                                    Hình ảnh (tải nhiều ảnh)
-                                </label>
-                                <div className="flex gap-2 items-center">
-                                    <button
-                                        type="button"
-                                        onClick={handleClickUploadSupportImages}
-                                        className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded shadow-lg transition-colors disabled:opacity-60"
-                                        disabled={uploadingSupportImages}
-                                    >
-                                        {uploadingSupportImages ? 'Đang tải...' : 'Chọn ảnh'}
-                                    </button>
-
-                                    <input
-                                        type="file"
-                                        accept="image/*"
-                                        multiple
-                                        ref={supportFileInputRef}
-                                        className="hidden"
-                                        onChange={handleSupportFilesChange}
-                                    />
-                                </div>
-
-                                <div className="mt-2 flex flex-wrap gap-2">
-                                    {supportImageUrls.map((url) => (
-                                        <div
-                                            key={url}
-                                            className="w-20 h-20 border rounded flex items-center justify-center relative overflow-hidden"
-                                        >
-                                            <img
-                                                src={buildImageUrl(url)}
-                                                alt="Sở cứ"
-                                                className="w-full h-full object-cover"
-                                            />
-                                            <button
-                                                type="button"
-                                                onClick={() => removeSupportImage(url)}
-                                                className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-5 h-5 text-[10px] flex items-center justify-center"
-                                            >
-                                                ✕
-                                            </button>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Action Buttons */}
+                    {/* NÚT */}
                     <div className="flex justify-end gap-6">
                         <button
                             className="px-8 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold text-sm shadow-lg transition-colors"
@@ -906,113 +704,76 @@ export default function TaoPhieuXuatKho() {
                         </button>
                     </div>
                 </div>
-            </main>
 
-            {/* ===== MODAL CHỌN HÀNG HÓA ===== */}
-            {showProductModal && (
-                <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-lg shadow-2xl w-[900px] max-h-[80vh] flex flex-col">
-                        <div className="px-4 py-3 border-b flex items-center justify-between">
-                            <h3 className="font-semibold text-base">
-                                Chọn hàng hóa từ danh sách hệ thống
-                            </h3>
-                            <button
-                                type="button"
-                                onClick={closeProductModal}
-                                className="text-gray-500 hover:text-gray-700"
-                            >
-                                ✕
-                            </button>
-                        </div>
+                {/* MODAL CHỌN HÀNG HÓA */}
+                {showProductModal && (
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                        <div className="bg-white rounded-lg w-[600px] max-h-[80vh] flex flex-col">
+                            <div className="px-6 py-4 border-b">
+                                <h3 className="text-lg font-bold">Chọn sản phẩm</h3>
+                            </div>
 
-                        <div className="p-4 flex-1 overflow-auto">
-                            {loadingProducts ? (
-                                <p className="text-sm text-gray-500">
-                                    Đang tải danh sách hàng hóa...
-                                </p>
-                            ) : productError ? (
-                                <p className="text-sm text-red-600">{productError}</p>
-                            ) : (
-                                <table className="w-full text-sm border border-gray-200">
-                                    <thead>
-                                        <tr className="bg-gray-100 h-10">
-                                            <th className="w-10 px-2 text-center border-b border-r">
-                                                Chọn
-                                            </th>
-                                            <th className="px-2 text-left border-b border-r">
-                                                Tên hàng
-                                            </th>
-                                            <th className="px-2 text-center border-b border-r">
-                                                Mã hàng
-                                            </th>
-                                            <th className="px-2 text-center border-b border-r">
-                                                Tồn kho
-                                            </th>
-                                            <th className="px-2 text-center border-b border-r">
-                                                Đơn giá
-                                            </th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {productList.map((p) => (
-                                            <tr
-                                                key={p.id}
-                                                className="h-9 hover:bg-gray-50 border-b last:border-b-0"
-                                            >
-                                                <td className="px-2 text-center border-r">
+                            <div className="flex-1 overflow-y-auto p-6">
+                                {loadingProducts ? (
+                                    <div className="text-center py-8 text-gray-500">Đang tải...</div>
+                                ) : productError ? (
+                                    <div className="text-center py-8 text-red-600">{productError}</div>
+                                ) : productList.length === 0 ? (
+                                    <div className="text-center py-8 text-gray-500">Không có sản phẩm nào</div>
+                                ) : (
+                                    <div className="space-y-2">
+                                        {productList.map((product) => {
+                                            const alreadyAdded = selectedProductIds.includes(product.id);
+                                            return (
+                                                <label
+                                                    key={product.id}
+                                                    className={`flex items-center gap-3 p-3 rounded border cursor-pointer transition-colors ${alreadyAdded
+                                                        ? 'bg-gray-100 border-gray-300 cursor-not-allowed'
+                                                        : 'hover:bg-blue-50 border-gray-200'
+                                                        }`}
+                                                >
                                                     <input
                                                         type="checkbox"
-                                                        checked={selectedProductIds.includes(p.id)}
-                                                        onChange={() => toggleSelectProduct(p.id)}
+                                                        checked={selectedProductIds.includes(product.id)}
+                                                        disabled={alreadyAdded}
+                                                        onChange={() => toggleSelectProduct(product.id)}
+                                                        className="w-4 h-4"
                                                     />
-                                                </td>
-                                                <td className="px-2 border-r">{p.name}</td>
-                                                <td className="px-2 text-center border-r">
-                                                    {p.code}
-                                                </td>
-                                                <td className="px-2 text-center border-r">
-                                                    {p.quantity ?? 0}
-                                                </td>
-                                                <td className="px-2 text-right">
-                                                    {formatCurrency(p.unitPrice ?? 0)}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                        {productList.length === 0 && !loadingProducts && (
-                                            <tr>
-                                                <td
-                                                    colSpan={5}
-                                                    className="px-2 py-3 text-center text-gray-500"
-                                                >
-                                                    Không có hàng hóa nào
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </table>
-                            )}
-                        </div>
+                                                    <div className="flex-1">
+                                                        <div className="font-medium">{product.name}</div>
+                                                        <div className="text-sm text-gray-500">
+                                                            Mã: {product.code} | Tồn: {product.quantity ?? 0}
+                                                            {alreadyAdded && <span className="ml-2 text-orange-600">(Đã có trong phiếu)</span>}
+                                                        </div>
+                                                    </div>
+                                                </label>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
 
-                        <div className="px-4 py-3 border-t flex justify-end gap-3">
-                            <button
-                                type="button"
-                                onClick={closeProductModal}
-                                className="px-5 py-2 text-sm rounded border border-gray-300 hover:bg-gray-100"
-                            >
-                                Đóng
-                            </button>
-                            <button
-                                type="button"
-                                onClick={handleAddSelectedProducts}
-                                className="px-5 py-2 text-sm rounded bg-blue-600 hover:bg-blue-700 text-white font-semibold disabled:opacity-60"
-                                disabled={loadingProducts || productList.length === 0}
-                            >
-                                Thêm hàng đã chọn
-                            </button>
+                            <div className="px-6 py-4 border-t flex justify-end gap-3">
+                                <button
+                                    type="button"
+                                    onClick={closeProductModal}
+                                    className="px-6 py-2 bg-gray-300 hover:bg-gray-400 rounded-lg transition-colors"
+                                >
+                                    Hủy
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleAddSelectedProducts}
+                                    disabled={loadingProducts}
+                                    className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50"
+                                >
+                                    Thêm
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )}
+            </main>
         </div>
     );
 }

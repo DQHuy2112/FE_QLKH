@@ -5,22 +5,19 @@ import { useRouter } from 'next/navigation';
 import Header from '@/components/layout/Header';
 import Sidebar from '@/components/layout/Sidebar';
 import { createSupplier } from '@/services/supplier.service';
+import { SUPPLIER_TYPES, SUPPLIER_TYPE_LABELS } from '@/types/supplier';
 
 export default function ThemMoiNguon() {
     const router = useRouter();
 
-    // form state
+    // form state - chỉ giữ các field có trong DB
     const [type, setType] = useState('');
     const [name, setName] = useState('');
     const [code, setCode] = useState('');
     const [phone, setPhone] = useState('');
     const [email, setEmail] = useState('');
     const [address, setAddress] = useState('');
-    const [taxCode, setTaxCode] = useState('');
-    const [representative, setRepresentative] = useState('');
-    const [position, setPosition] = useState('');
     const [note, setNote] = useState('');
-    const [status, setStatus] = useState<'active' | 'inactive'>('active');
 
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -101,11 +98,11 @@ export default function ThemMoiNguon() {
                                     onChange={(e) => setType(e.target.value)}
                                 >
                                     <option value="">Chọn loại nguồn</option>
-                                    <option>Nhà cung cấp</option>
-                                    <option>Đại lý cấp 1</option>
-                                    <option>Đại lý cấp 2</option>
-                                    <option>NVBH</option>
-                                    <option>Kho tổng</option>
+                                    {Object.entries(SUPPLIER_TYPE_LABELS).map(([key, label]) => (
+                                        <option key={key} value={key}>
+                                            {label}
+                                        </option>
+                                    ))}
                                 </select>
                                 <svg
                                     className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none"
@@ -192,48 +189,6 @@ export default function ThemMoiNguon() {
                             />
                         </div>
 
-                        {/* Mã số thuế */}
-                        <div className="grid grid-cols-3 gap-4 items-center">
-                            <label className="text-sm font-medium text-gray-700">
-                                Mã số thuế
-                            </label>
-                            <input
-                                type="text"
-                                className="col-span-2 px-4 py-2 border border-blue-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                placeholder="Nhập mã số thuế"
-                                value={taxCode}
-                                onChange={(e) => setTaxCode(e.target.value)}
-                            />
-                        </div>
-
-                        {/* Người đại diện */}
-                        <div className="grid grid-cols-3 gap-4 items-center">
-                            <label className="text-sm font-medium text-gray-700">
-                                Người đại diện
-                            </label>
-                            <input
-                                type="text"
-                                className="col-span-2 px-4 py-2 border border-blue-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                placeholder="Nhập tên người đại diện"
-                                value={representative}
-                                onChange={(e) => setRepresentative(e.target.value)}
-                            />
-                        </div>
-
-                        {/* Chức vụ */}
-                        <div className="grid grid-cols-3 gap-4 items-center">
-                            <label className="text-sm font-medium text-gray-700">
-                                Chức vụ
-                            </label>
-                            <input
-                                type="text"
-                                className="col-span-2 px-4 py-2 border border-blue-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                placeholder="Nhập chức vụ"
-                                value={position}
-                                onChange={(e) => setPosition(e.target.value)}
-                            />
-                        </div>
-
                         {/* Ghi chú */}
                         <div className="grid grid-cols-3 gap-4 items-start">
                             <label className="text-sm font-medium text-gray-700 pt-2">
@@ -245,37 +200,6 @@ export default function ThemMoiNguon() {
                                 value={note}
                                 onChange={(e) => setNote(e.target.value)}
                             />
-                        </div>
-
-                        {/* Trạng thái (tạm thời chỉ lưu FE) */}
-                        <div className="grid grid-cols-3 gap-4 items-center">
-                            <label className="text-sm font-medium text-gray-700">
-                                Trạng thái
-                            </label>
-                            <div className="col-span-2 flex items-center gap-6">
-                                <label className="flex items-center gap-2 cursor-pointer">
-                                    <input
-                                        type="radio"
-                                        name="status"
-                                        value="active"
-                                        checked={status === 'active'}
-                                        onChange={() => setStatus('active')}
-                                        className="w-4 h-4 text-blue-600 focus:ring-blue-500"
-                                    />
-                                    <span className="text-sm">Hoạt động</span>
-                                </label>
-                                <label className="flex items-center gap-2 cursor-pointer">
-                                    <input
-                                        type="radio"
-                                        name="status"
-                                        value="inactive"
-                                        checked={status === 'inactive'}
-                                        onChange={() => setStatus('inactive')}
-                                        className="w-4 h-4 text-blue-600 focus:ring-blue-500"
-                                    />
-                                    <span className="text-sm">Ngừng hoạt động</span>
-                                </label>
-                            </div>
                         </div>
 
                         {/* Action Buttons */}

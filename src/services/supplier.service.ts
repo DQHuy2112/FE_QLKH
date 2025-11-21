@@ -4,18 +4,19 @@ import { apiFetch } from '@/lib/api-client';
 const SUPPLIER_BASE_URL = '/api/suppliers';
 const EXPORT_SUPPLIER_URL = '/api/exports/suppliers';
 
+// Interface khớp với ShopSupplier entity trong backend
 export interface Supplier {
     id: number;
     code?: string;
     name: string;
-    type?: string | null;
+    type?: string | null;           // supplier_type
     phone?: string | null;
     address?: string | null;
     email?: string | null;
-    description?: string | null;
+    description?: string | null;    // ghi chú
     image?: string | null;
-    createdAt?: string;
-    updatedAt?: string;
+    createdAt?: string;             // created_at
+    updatedAt?: string;             // updated_at
 }
 
 export interface ExportSupplier {
@@ -31,8 +32,11 @@ type ApiResponse<T> = {
 
 // ==== CRUD danh mục NCC (/api/suppliers) ====
 
-export async function getSuppliers(): Promise<Supplier[]> {
-    const res = await apiFetch<ApiResponse<Supplier[]>>(SUPPLIER_BASE_URL);
+export async function getSuppliers(type?: string): Promise<Supplier[]> {
+    const url = type
+        ? `${SUPPLIER_BASE_URL}?type=${encodeURIComponent(type)}`
+        : SUPPLIER_BASE_URL;
+    const res = await apiFetch<ApiResponse<Supplier[]>>(url);
     return res.data;
 }
 

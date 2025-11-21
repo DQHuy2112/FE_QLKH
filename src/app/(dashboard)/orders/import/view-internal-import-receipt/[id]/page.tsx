@@ -1,37 +1,188 @@
+/* eslint-disable @next/next/no-img-element */
 'use client';
 
+import { useEffect, useState } from 'react';
+import { useRouter, useParams } from 'next/navigation';
 import Header from '@/components/layout/Header';
 import Sidebar from '@/components/layout/Sidebar';
-import { useRouter } from 'next/navigation';
+import { getInternalImportById, confirmInternalImport, cancelInternalImport, type InternalImport, type InternalImportDetail } from '@/services/inventory.service';
+import { getProduct } from '@/services/product.service';
 
-interface ProductItem {
-    id: number;
-    name: string;
-    code: string;
-    unit: string;
-    price: string;
-    quantity: string;
-    discount: string;
-    total: string;
+const API_BASE_URL = 'http://localhost:8080';
+
+function buildImageUrl(path: string | null | undefined): string {
+    if (!path) return '';
+    if (path.startsWith('http://') || path.startsWith('https://')) return path;
+    const clean = path.startsWith('/') ? path : `/${path}`;
+    return `${API_BASE_URL}${clean}`;
 }
 
-const products: ProductItem[] = [
-    { id: 1, name: 'ĐT Samsung Galaxy Z', code: 'XXXXX', unit: 'Cái', price: '30.000.000', quantity: '10', discount: '5%', total: '285.000.000' },
-    { id: 2, name: 'ĐT Xiaomi Redmi 10', code: 'XXXXX', unit: 'Cái', price: '3.998.000', quantity: '10', discount: '', total: '39.980.000' },
-    { id: 3, name: 'ĐT Iphone 13 Promax', code: 'XXXXX', unit: 'Cái', price: '40.000.000', quantity: '5', discount: '5%', total: '78.154.168' },
-    { id: 4, name: 'Tai nghe Xiaomi', code: 'XXXXX', unit: 'Cái', price: '20.000.000', quantity: '4', discount: '5%', total: '800.000' },
-    { id: 5, name: 'Tai nghe Oppo Renco', code: 'XXXXX', unit: 'Cái', price: '790.000', quantity: '55', discount: '', total: '20.000.000' },
-];
+const formatCurrency = (value: number) => value.toLocaleString('vi-VN');
+const formatDateTime = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleString('vi-VN', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+};
+
+// Helper function để chuyển trạng thái sang tiếng Việt
+function getStatusText(status: string): string {
+    const statusMap: Record<string, string> = {
+        'PENDING': 'Chờ xử lý',
+        'IMPORTED': 'Đã nhập',
+        'EXPORTED': 'Đã xuất',
+        'CANCELLED': 'Đã hủy',
+        'APPROVED': 'Đã duyệt',
+        'REJECTED': 'Đã từ chối',
+        'RETURNED': 'Đã hoàn trả',
+    };
+    return statusMap[status] || status;
+}
 
 export default function ViewInternalImportReceipt() {
     const router = useRouter();
+    const params = useParams();
+    const id = Number(params.id);
+
+    const [data, setData] = useState<InternalImport | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [processing, setProcessing] = useState(false);
+
+    useEffect(() => {
+        loadData();
+    }, [id]);
+
+    const loadData = async () => {
+        try {
+            setLoading(true);
+            const result = await getInternalImportById(id);
+
+            console.log('📦 Internal Import Data:', result);
+
+            // Fetch thông tin supplier nội bộ (kho nguồn)
+            let sourceSupplier: any = null;
+            if (result.sourceStoreId) {
+                try {
+                    const { getSupplier } = await import('@/services/supplier.service');
+                    sourceSupplier = await getSupplier(result.sourceStoreId);
+                    console.log('🏪 Source Supplier:', sourceSupplier);
+                } catch (err) {
+                    console.error('Failed to fetch source supplier:', err);
+                }
+            }
+
+            // Map lại thông tin kho nguồn từ supplier
+            const mappedImport: InternalImport = {
+                ...result,
+                sourceStoreName: sourceSupplier?.name ?? result.sourceStoreName ?? null,
+                sourceStoreCode: sourceSupplier?.code ?? result.sourceStoreCode ?? null,
+                sourceStorePhone: sourceSupplier?.phone ?? result.sourceStorePhone ?? null,
+                sourceStoreAddress: sourceSupplier?.address ?? result.sourceStoreAddress ?? null,
+            };
+
+            console.log('✅ Mapped Import:', mappedImport);
+
+            // Fetch thông tin sản phẩm cho từng item nếu thiếu
+            if (mappedImport.items && mappedImport.items.length > 0) {
+                const mappedItems: InternalImportDetail[] = await Promise.all(
+                    mappedImport.items.map(async (item) => {
+                        if (item.productCode && item.productName) {
+                            return item; // Đã có đầy đủ thông tin
+                        }
+
+                        // Fetch thông tin sản phẩm
+                        try {
+                            const product = await getProduct(item.productId);
+                            return {
+                                ...item,
+                                productCode: product.code,
+                                productName: product.name,
+                                unit: item.unit || 'Cái',
+                            };
+                        } catch (err) {
+                            console.error('Failed to fetch product:', item.productId, err);
+                            return {
+                                ...item,
+                                productCode: `ID: ${item.productId}`,
+                                productName: `Sản phẩm #${item.productId}`,
+                            };
+                        }
+                    })
+                );
+                mappedImport.items = mappedItems;
+            }
+
+            setData(mappedImport);
+        } catch (error) {
+            console.error('Lỗi khi tải chi tiết phiếu nhập:', error);
+            alert('Không thể tải chi tiết phiếu nhập');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleConfirm = async () => {
+        if (!confirm('Xác nhận nhập kho?')) return;
+        try {
+            setProcessing(true);
+            await confirmInternalImport(id);
+            alert('Xác nhận nhập kho thành công!');
+            loadData();
+        } catch (error) {
+            console.error('Lỗi khi xác nhận:', error);
+            alert(error instanceof Error ? error.message : 'Không thể xác nhận phiếu nhập');
+        } finally {
+            setProcessing(false);
+        }
+    };
+
+    const handleCancel = async () => {
+        if (!confirm('Hủy phiếu nhập này?')) return;
+        try {
+            setProcessing(true);
+            await cancelInternalImport(id);
+            alert('Hủy phiếu nhập thành công!');
+            loadData();
+        } catch (error) {
+            console.error('Lỗi khi hủy:', error);
+            alert(error instanceof Error ? error.message : 'Không thể hủy phiếu nhập');
+        } finally {
+            setProcessing(false);
+        }
+    };
 
     const calculateTotal = () => {
-        return products.reduce((sum, item) => {
-            const total = item.total ? parseInt(item.total.replace(/\./g, '')) : 0;
-            return sum + total;
-        }, 0).toLocaleString('vi-VN');
+        if (!data?.items) return 0;
+        return data.items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
     };
+
+    if (loading) {
+        return (
+            <div className="min-h-screen">
+                <Header />
+                <Sidebar />
+                <main className="ml-[377px] mt-[113px] p-6 pr-12">
+                    <div className="text-center py-8">Đang tải...</div>
+                </main>
+            </div>
+        );
+    }
+
+    if (!data) {
+        return (
+            <div className="min-h-screen">
+                <Header />
+                <Sidebar />
+                <main className="ml-[377px] mt-[113px] p-6 pr-12">
+                    <div className="text-center py-8">Không tìm thấy phiếu nhập</div>
+                </main>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen">
@@ -39,12 +190,10 @@ export default function ViewInternalImportReceipt() {
             <Sidebar />
 
             <main className="ml-[377px] mt-[113px] p-6 pr-12 flex gap-6">
-                {/* Main Content */}
                 <div className="flex-1">
-                    {/* Form */}
                     <div className="bg-white rounded-lg shadow-2xl p-8 border border-black">
                         <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-xl font-bold text-center flex-1">PHIẾU NHẬP KHO</h2>
+                            <h2 className="text-xl font-bold text-center flex-1">PHIẾU NHẬP KHO NỘI BỘ</h2>
                             <button
                                 onClick={() => router.back()}
                                 className="text-2xl font-bold hover:text-red-600 transition-colors"
@@ -58,48 +207,46 @@ export default function ViewInternalImportReceipt() {
                             <h3 className="text-base font-bold mb-4">Thông tin chung</h3>
 
                             <div className="grid grid-cols-2 gap-x-12 gap-y-4">
-                                {/* Left Column */}
                                 <div className="space-y-4">
                                     <div className="flex items-center gap-3">
-                                        <label className="w-28 text-sm">Nguồn cung</label>
+                                        <label className="w-28 text-sm">Nguồn xuất</label>
                                         <div className="flex-1 px-3 py-1.5 border border-black bg-white text-sm text-right">
-                                            Đại lý A
+                                            {data.sourceStoreName || 'N/A'}
                                         </div>
                                     </div>
 
                                     <div className="flex items-center gap-3">
                                         <label className="w-28 text-sm">Mã nguồn</label>
                                         <div className="flex-1 px-3 py-1.5 border border-black bg-white text-sm text-right">
-                                            DLA_9843
+                                            {data.sourceStoreCode || 'N/A'}
                                         </div>
                                     </div>
 
                                     <div className="flex items-center gap-3">
                                         <label className="w-28 text-sm">Số điện thoại</label>
                                         <div className="flex-1 px-3 py-1.5 border border-black bg-white text-sm text-right">
-                                            0985424661
+                                            {data.sourceStorePhone || 'N/A'}
                                         </div>
                                     </div>
 
                                     <div className="flex items-start gap-3">
                                         <label className="w-28 text-sm pt-2">Địa chỉ</label>
                                         <div className="flex-1 px-3 py-2 border border-black bg-white text-sm text-right h-14">
-                                            446 Minh Khai, p. Vĩnh Tuy, q2, HCM.
+                                            {data.sourceStoreAddress || 'N/A'}
                                         </div>
                                     </div>
                                 </div>
 
-                                {/* Right Column */}
                                 <div className="space-y-4">
                                     <div className="flex items-center gap-3">
-                                        <label className="w-28 text-sm">Mã phiếu</label>
+                                        <label className="w-28 text-sm">Mã lệnh</label>
                                         <div className="flex-1 px-3 py-1.5 border border-black bg-gray-200 text-sm text-right">
-                                            PNK_NB_001
+                                            {data.code}
                                         </div>
                                     </div>
 
                                     <div className="flex items-center gap-3">
-                                        <label className="w-28 text-sm">Nhập tại kho</label>
+                                        <label className="w-28 text-sm">Xuất tại kho</label>
                                         <div className="flex-1 px-3 py-1.5 border border-black bg-white text-sm text-right">
                                             Kho tổng
                                         </div>
@@ -115,7 +262,7 @@ export default function ViewInternalImportReceipt() {
                                     <div className="flex items-start gap-3">
                                         <label className="w-28 text-sm pt-2">Lý do</label>
                                         <div className="flex-1 px-3 py-2 border border-black bg-white text-sm text-right h-14">
-                                            Nhập hàng từ đại lý
+                                            {data.note || 'N/A'}
                                         </div>
                                     </div>
                                 </div>
@@ -133,124 +280,96 @@ export default function ViewInternalImportReceipt() {
                                         <th className="px-2 text-center font-bold text-sm w-20">Đơn vị tính</th>
                                         <th className="px-2 text-center font-bold text-sm w-28">Đơn giá</th>
                                         <th className="px-2 text-center font-bold text-sm w-20">Số lượng</th>
-                                        <th className="px-2 text-center font-bold text-sm w-24">Chiết khấu</th>
                                         <th className="px-2 text-center font-bold text-sm w-32">Thành tiền</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {products.map((product) => (
-                                        <tr key={product.id} className="border border-gray-400 h-12">
-                                            <td className="px-2 text-center text-sm border-r border-gray-400">{product.id}</td>
-                                            <td className="px-2 text-right text-sm border-r border-gray-400">{product.name}</td>
-                                            <td className="px-2 text-center text-sm border-r border-gray-400">{product.code}</td>
-                                            <td className="px-2 text-center text-sm border-r border-gray-400">{product.unit}</td>
-                                            <td className="px-2 text-right text-sm border-r border-gray-400">{product.price}</td>
-                                            <td className="px-2 text-center text-sm border-r border-gray-400">{product.quantity}</td>
-                                            <td className="px-2 text-right text-sm border-r border-gray-400">{product.discount}</td>
-                                            <td className="px-2 text-right text-sm font-medium border-r border-gray-400">{product.total}</td>
+                                    {data.items && data.items.length > 0 ? (
+                                        data.items.map((item, index) => (
+                                            <tr key={item.id || index} className="border border-gray-400 h-12">
+                                                <td className="px-2 text-center text-sm border-r border-gray-400">{index + 1}</td>
+                                                <td className="px-2 text-right text-sm border-r border-gray-400">{item.productName}</td>
+                                                <td className="px-2 text-center text-sm border-r border-gray-400">{item.productCode}</td>
+                                                <td className="px-2 text-center text-sm border-r border-gray-400">{item.unitName || item.unit}</td>
+                                                <td className="px-2 text-right text-sm border-r border-gray-400">{formatCurrency(item.unitPrice)}</td>
+                                                <td className="px-2 text-center text-sm border-r border-gray-400">{item.quantity}</td>
+                                                <td className="px-2 text-right text-sm font-medium border-r border-gray-400">
+                                                    {formatCurrency(item.quantity * item.unitPrice)}
+                                                </td>
+                                            </tr>
+                                        ))
+                                    ) : (
+                                        <tr>
+                                            <td colSpan={7} className="px-2 py-4 text-center text-gray-500">
+                                                Không có sản phẩm
+                                            </td>
                                         </tr>
-                                    ))}
+                                    )}
                                     <tr className="border border-gray-400 h-12 bg-white">
-                                        <td colSpan={7} className="px-2 text-center font-bold text-sm border-r border-gray-400">Tổng</td>
-                                        <td className="px-2 text-right font-bold text-sm border-r border-gray-400">{calculateTotal()}</td>
+                                        <td colSpan={6} className="px-2 text-center font-bold text-sm border-r border-gray-400">Tổng</td>
+                                        <td className="px-2 text-right font-bold text-sm border-r border-gray-400">
+                                            {formatCurrency(calculateTotal())}
+                                        </td>
                                     </tr>
                                 </tbody>
                             </table>
                         </div>
 
-                        {/* Hợp đồng */}
-                        <div className="border border-black bg-gray-100 p-6">
-                            <div className="flex items-center gap-4 mb-4">
-                                <svg width="25" height="25" viewBox="0 0 25 25" fill="none">
-                                    <path d="M7 3H17C18.1046 3 19 3.89543 19 5V21L12 17L5 21V5C5 3.89543 5.89543 3 7 3Z" stroke="#000" strokeWidth="2" />
-                                </svg>
-                                <h3 className="text-sm font-bold">Hợp đồng</h3>
-                            </div>
-                            <div className="flex gap-4">
-                                <div className="w-[183px] h-[236px] bg-gray-300 rounded flex items-center justify-center">
-                                    <span className="text-gray-600">Hình ảnh 1</span>
+                        {/* Hợp đồng / Ảnh đính kèm */}
+                        {data.attachmentImages && data.attachmentImages.length > 0 && (
+                            <div className="border border-black bg-gray-100 p-6 rounded mb-6">
+                                <h3 className="text-base font-bold mb-4">Hợp đồng / Ảnh đính kèm</h3>
+                                <div className="flex gap-4 flex-wrap">
+                                    {data.attachmentImages.map((url, idx) => (
+                                        <div
+                                            key={idx}
+                                            className="w-[180px] h-[240px] bg-white border rounded shadow flex items-center justify-center"
+                                        >
+                                            <img
+                                                src={buildImageUrl(url)}
+                                                alt={`Ảnh ${idx + 1}`}
+                                                className="w-full h-full object-contain cursor-pointer hover:opacity-90 transition-opacity"
+                                                onClick={() => window.open(buildImageUrl(url), '_blank')}
+                                            />
+                                        </div>
+                                    ))}
                                 </div>
-                                <div className="w-[183px] h-[236px] bg-gray-300 rounded flex items-center justify-center">
-                                    <span className="text-gray-600">Hình ảnh 2</span>
-                                </div>
                             </div>
-                        </div>
+                        )}
+
+                        {/* Action Buttons */}
+                        {data.status === 'PENDING' && (
+                            <div className="flex justify-end gap-4">
+                                <button
+                                    onClick={handleCancel}
+                                    disabled={processing}
+                                    className="px-6 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg disabled:opacity-50"
+                                >
+                                    Hủy phiếu
+                                </button>
+                                <button
+                                    onClick={handleConfirm}
+                                    disabled={processing}
+                                    className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg disabled:opacity-50"
+                                >
+                                    Xác nhận nhập kho
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </div>
 
-                {/* Timeline Sidebar */}
+                {/* Status Sidebar */}
                 <div className="w-[274px] bg-gray-100 rounded-lg p-5 shadow-lg h-fit">
                     <h3 className="text-base font-bold mb-4">Tình trạng</h3>
-
-                    <div className="space-y-6">
-                        {/* Tạo bởi */}
-                        <div className="space-y-3">
-                            <div className="flex items-center justify-between">
-                                <span className="text-sm">Tạo bởi</span>
-                                <div className="flex items-center gap-2 px-2 py-1.5 bg-[#ffc19e] rounded-lg shadow text-sm">
-                                    <span>Xóa</span>
-                                    <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                                        <path d="M9 1L9 17M9 1L5 5M9 1L13 5" stroke="#000" strokeWidth="2" strokeLinecap="round" />
-                                    </svg>
-                                </div>
-                            </div>
-                            <div className="px-3 py-2 bg-gray-200 border border-gray-400 text-sm text-right">Nguyễn Văn A</div>
-                            <div className="px-3 py-1.5 bg-gray-200 border border-gray-400 text-sm text-right">13/11/2022  15:20</div>
+                    <div className="space-y-4">
+                        <div className="px-4 py-2 bg-white border border-gray-400 rounded">
+                            <div className="text-sm font-bold mb-1">Trạng thái</div>
+                            <div className="text-sm">{getStatusText(data.status)}</div>
                         </div>
-
-                        {/* Duyệt bởi */}
-                        <div className="space-y-3">
-                            <div className="flex items-center justify-between">
-                                <span className="text-sm">Duyệt bởi</span>
-                                <div className="flex items-center gap-2 px-2 py-1.5 bg-[#ffbc16] rounded-lg shadow text-sm">
-                                    <span>Duyệt</span>
-                                    <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                                        <path d="M4 9L8 13L14 5" stroke="#000" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                                    </svg>
-                                </div>
-                            </div>
-                            <div className="px-3 py-2 bg-white border border-gray-400 h-8"></div>
-                            <div className="px-3 py-1.5 bg-white border border-gray-400 h-7"></div>
-                        </div>
-
-                        {/* Từ chối bởi */}
-                        <div className="space-y-3">
-                            <div className="flex items-center justify-between">
-                                <span className="text-sm">Từ chối bởi</span>
-                                <div className="flex items-center gap-2 px-2 py-1.5 bg-[#ee4b3d] rounded-lg shadow text-sm text-white">
-                                    <span>Từ chối</span>
-                                    <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                                        <path d="M5 5L13 13M5 13L13 5" stroke="white" strokeWidth="2" strokeLinecap="round" />
-                                    </svg>
-                                </div>
-                            </div>
-                            <div className="px-3 py-2 bg-white border border-gray-400 h-8"></div>
-                            <div className="px-3 py-1.5 bg-white border border-gray-400 h-7"></div>
-                        </div>
-
-                        {/* Đã nhập bởi */}
-                        <div className="space-y-3">
-                            <div className="flex items-center justify-between">
-                                <span className="text-sm">Đã nhập bởi</span>
-                                <div className="px-2 py-1.5 bg-[#888888] rounded-lg shadow text-sm text-white">Đã nhập</div>
-                            </div>
-                            <div className="px-3 py-2 bg-white border border-gray-400 h-8"></div>
-                            <div className="px-3 py-1.5 bg-white border border-gray-400 h-7"></div>
-                        </div>
-
-                        {/* Hoàn hàng bởi */}
-                        <div className="space-y-3">
-                            <div className="flex items-center justify-between">
-                                <span className="text-sm">Hoàn hàng bởi</span>
-                                <div className="flex items-center gap-2 px-2 py-1.5 bg-[#888888] rounded-lg shadow text-sm text-white">
-                                    <span>Hoàn hàng</span>
-                                    <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                                        <path d="M4 9H14M4 9L8 5M4 9L8 13" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                                    </svg>
-                                </div>
-                            </div>
-                            <div className="px-3 py-2 bg-white border border-gray-400 h-8"></div>
-                            <div className="px-3 py-1.5 bg-white border border-gray-400 h-7"></div>
+                        <div className="px-4 py-2 bg-white border border-gray-400 rounded">
+                            <div className="text-sm font-bold mb-1">Tổng giá trị</div>
+                            <div className="text-sm">{formatCurrency(data.totalValue)}</div>
                         </div>
                     </div>
                 </div>

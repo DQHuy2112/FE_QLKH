@@ -96,6 +96,12 @@ export default function EditImportReceiptPage() {
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    const [showProductModal, setShowProductModal] = useState(false);
+    const [productList, setProductList] = useState<Product[]>([]);
+    const [loadingProducts, setLoadingProducts] = useState(false);
+    const [productError, setProductError] = useState<string | null>(null);
+    const [selectedProductIds, setSelectedProductIds] = useState<number[]>([]);
+
     /* ============================================================
        LOAD DỮ LIỆU PHIẾU NHẬP
     ============================================================ */
@@ -105,7 +111,7 @@ export default function EditImportReceiptPage() {
         (async () => {
             try {
                 const [sup, productList, receipt] = await Promise.all([
-                    getSuppliers(),
+                    getSuppliers('NCC'),
                     getProducts(),
                     getSupplierImport(importId),
                 ]);
@@ -235,6 +241,10 @@ export default function EditImportReceiptPage() {
         e.target.value = '';
     };
 
+    const removeImage = (url: string) => {
+        setAttachmentImages((prev) => prev.filter((u) => u !== url));
+    };
+
     /* ============================================================
        HANDLE PRODUCT TABLE
     ============================================================ */
@@ -267,6 +277,83 @@ export default function EditImportReceiptPage() {
         () => items.reduce((s, it) => s + it.total, 0),
         [items],
     );
+
+    const openProductModal = async () => {
+        setShowProductModal(true);
+        setProductError(null);
+
+        const idsFromCurrent = items.map((p) => p.productId);
+        setSelectedProductIds(idsFromCurrent);
+
+        if (productList.length > 0) return;
+
+        try {
+            setLoadingProducts(true);
+            const list = await getProducts();
+            setProductList(list);
+        } catch (e) {
+            console.error(e);
+            setProductError(
+                e instanceof Error
+                    ? e.message
+                    : 'Có lỗi xảy ra khi tải danh sách hàng hóa',
+            );
+        } finally {
+            setLoadingProducts(false);
+        }
+    };
+
+    const closeProductModal = () => {
+        setShowProductModal(false);
+    };
+
+    const toggleSelectProduct = (productId: number) => {
+        setSelectedProductIds((prev) =>
+            prev.includes(productId)
+                ? prev.filter((id) => id !== productId)
+                : [...prev, productId],
+        );
+    };
+
+    const handleAddSelectedProducts = () => {
+        if (selectedProductIds.length === 0) {
+            closeProductModal();
+            return;
+        }
+
+        setItems((prev) => {
+            const existingProductIds = new Set(prev.map((p) => p.productId));
+            let runningRowId = prev.length > 0 ? Math.max(...prev.map((p) => p.rowId)) : 0;
+
+            const newRows: ProductItem[] = [];
+
+            selectedProductIds.forEach((pid) => {
+                if (existingProductIds.has(pid)) return;
+
+                const prod = productList.find((p) => p.id === pid);
+                if (!prod) return;
+
+                runningRowId += 1;
+
+                const row: ProductItem = {
+                    rowId: runningRowId,
+                    productId: prod.id,
+                    name: prod.name,
+                    code: prod.code,
+                    unit: 'Cái',
+                    unitPrice: prod.unitPrice ?? 0,
+                    quantity: 0,
+                    total: 0,
+                };
+
+                newRows.push(row);
+            });
+
+            return [...prev, ...newRows];
+        });
+
+        closeProductModal();
+    };
 
     /* ============================================================
        SUBMIT UPDATE
@@ -315,6 +402,22 @@ export default function EditImportReceiptPage() {
             <Sidebar />
 
             <main className="ml-[377px] mt-[113px] p-6 pr-12">
+                {error && (
+                    <div className="mb-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded px-4 py-2">
+                        {error}
+                    </div>
+                )}
+
+                <div className="flex gap-4 mb-6">
+                    <button
+                        type="button"
+                        onClick={openProductModal}
+                        className="px-6 py-2.5 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-lg font-bold text-sm shadow-lg transition-all"
+                    >
+                        + Thêm hàng từ hệ thống
+                    </button>
+                </div>
+
                 <form onSubmit={handleSubmit} className="space-y-6">
                     {/* ======================================================================
                        THÔNG TIN CHUNG
@@ -510,92 +613,68 @@ export default function EditImportReceiptPage() {
                     </div>
 
                     {/* ======================================================================
-                       HỢP ĐỒNG & SỞ CỨ
+                       HỢP ĐỒNG / ẢNH ĐÍNH KÈM
                     ====================================================================== */}
-                    <div className="grid grid-cols-2 gap-6">
-                        {/* Hợp đồng */}
-                        <div className="border-2 border-gray-400 rounded p-4 bg-gray-50">
-                            <h3 className="font-semibold mb-3">Hợp đồng</h3>
+                    <div className="border border-black bg-gray-100 p-6 rounded mb-6">
+                        <h3 className="font-bold mb-4">
+                            Hợp đồng / Ảnh đính kèm
+                        </h3>
 
-                            <label className="block text-sm mb-1">Nội dung</label>
+                        <div className="mb-3">
+                            <button
+                                type="button"
+                                onClick={() => fileRef.current?.click()}
+                                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                            >
+                                Chọn ảnh
+                            </button>
                             <input
-                                className="w-full border rounded px-3 py-1.5 mb-3"
-                                value={contractContent}
-                                onChange={(e) =>
-                                    setContractContent(e.target.value)
-                                }
+                                ref={fileRef}
+                                type="file"
+                                multiple
+                                accept="image/*"
+                                className="hidden"
+                                onChange={handleUploadImages}
                             />
-
-                            <label className="block text-sm mb-1">
-                                Hình ảnh hợp đồng
-                            </label>
-                            <div className="flex items-center gap-3 mb-2">
-                                <button
-                                    type="button"
-                                    onClick={() => fileRef.current?.click()}
-                                    className="px-3 py-1.5 text-sm rounded bg-blue-600 text-white hover:bg-blue-700"
-                                >
-                                    Chọn ảnh từ máy
-                                </button>
-                                <input
-                                    ref={fileRef}
-                                    type="file"
-                                    multiple
-                                    accept="image/*"
-                                    className="hidden"
-                                    onChange={handleUploadImages}
-                                />
-                            </div>
-
-                            {attachmentImages.length > 0 && (
-                                <div className="space-y-2 mt-2">
-                                    {attachmentImages.map((img, idx) => {
-                                        const url = buildImageUrl(img);
-                                        return (
-                                            <div key={`${img}-${idx}`}>
-                                                <p className="text-xs text-gray-600 break-all">
-                                                    Ảnh {idx + 1}:{' '}
-                                                    <span className="font-mono">
-                                                        {img}
-                                                    </span>
-                                                </p>
-                                                {url && (
-                                                    <img
-                                                        src={url}
-                                                        alt={`Hợp đồng ${idx + 1}`}
-                                                        className="mt-1 max-h-40 border rounded bg-white object-contain"
-                                                    />
-                                                )}
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            )}
                         </div>
 
-                        {/* Sở cứ */}
-                        <div className="border-2 border-gray-400 rounded p-4 bg-gray-50">
-                            <h3 className="font-semibold mb-3">Sở cứ</h3>
-                            <label className="block text-sm mb-1">Nội dung</label>
-                            <textarea
-                                className="w-full border rounded px-3 py-1.5 h-32"
-                                value={evidenceContent}
-                                onChange={(e) =>
-                                    setEvidenceContent(e.target.value)
-                                }
-                            />
+                        <div className="flex gap-4 flex-wrap">
+                            {attachmentImages.length === 0 && (
+                                <p className="text-gray-600">Không có ảnh</p>
+                            )}
+
+                            {attachmentImages.map((img, idx) => {
+                                const url = buildImageUrl(img);
+                                return (
+                                    <div
+                                        key={idx}
+                                        className="w-[180px] h-[240px] bg-white border rounded shadow flex items-center justify-center relative"
+                                    >
+                                        {url ? (
+                                            <img
+                                                src={url}
+                                                className="w-full h-full object-contain"
+                                                alt={`Ảnh ${idx + 1}`}
+                                            />
+                                        ) : (
+                                            <span>No Image</span>
+                                        )}
+                                        <button
+                                            type="button"
+                                            onClick={() => removeImage(img)}
+                                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 text-sm flex items-center justify-center hover:bg-red-600"
+                                        >
+                                            ✕
+                                        </button>
+                                    </div>
+                                );
+                            })}
                         </div>
                     </div>
 
                     {/* ======================================================================
                        LỖI + NÚT
                     ====================================================================== */}
-                    {error && (
-                        <div className="text-sm text-red-600 bg-red-50 border border-red-200 px-3 py-2 rounded">
-                            {error}
-                        </div>
-                    )}
-
                     <div className="flex justify-end gap-4">
                         <button
                             type="button"
@@ -617,6 +696,75 @@ export default function EditImportReceiptPage() {
                         </button>
                     </div>
                 </form>
+
+                {/* MODAL CHỌN HÀNG HÓA */}
+                {showProductModal && (
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                        <div className="bg-white rounded-lg w-[600px] max-h-[80vh] flex flex-col">
+                            <div className="px-6 py-4 border-b">
+                                <h3 className="text-lg font-bold">Chọn sản phẩm</h3>
+                            </div>
+
+                            <div className="flex-1 overflow-y-auto p-6">
+                                {loadingProducts ? (
+                                    <div className="text-center py-8 text-gray-500">Đang tải...</div>
+                                ) : productError ? (
+                                    <div className="text-center py-8 text-red-600">{productError}</div>
+                                ) : productList.length === 0 ? (
+                                    <div className="text-center py-8 text-gray-500">Không có sản phẩm nào</div>
+                                ) : (
+                                    <div className="space-y-2">
+                                        {productList.map((product) => {
+                                            const alreadyAdded = selectedProductIds.includes(product.id);
+                                            return (
+                                                <label
+                                                    key={product.id}
+                                                    className={`flex items-center gap-3 p-3 rounded border cursor-pointer transition-colors ${alreadyAdded
+                                                        ? 'bg-gray-100 border-gray-300 cursor-not-allowed'
+                                                        : 'hover:bg-blue-50 border-gray-200'
+                                                        }`}
+                                                >
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={selectedProductIds.includes(product.id)}
+                                                        disabled={alreadyAdded}
+                                                        onChange={() => toggleSelectProduct(product.id)}
+                                                        className="w-4 h-4"
+                                                    />
+                                                    <div className="flex-1">
+                                                        <div className="font-medium">{product.name}</div>
+                                                        <div className="text-sm text-gray-500">
+                                                            Mã: {product.code} | Tồn: {product.quantity ?? 0}
+                                                            {alreadyAdded && <span className="ml-2 text-orange-600">(Đã có trong phiếu)</span>}
+                                                        </div>
+                                                    </div>
+                                                </label>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="px-6 py-4 border-t flex justify-end gap-3">
+                                <button
+                                    type="button"
+                                    onClick={closeProductModal}
+                                    className="px-6 py-2 bg-gray-300 hover:bg-gray-400 rounded-lg transition-colors"
+                                >
+                                    Hủy
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleAddSelectedProducts}
+                                    disabled={loadingProducts}
+                                    className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50"
+                                >
+                                    Thêm
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </main>
         </div>
     );
